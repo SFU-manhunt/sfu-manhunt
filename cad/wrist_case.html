@@ -387,9 +387,18 @@ function stats() {
   const i = model.info;
   document.getElementById('stats').innerHTML =
     `<div class="stat"><b>${i.OX.toFixed(1)} mm</b><small>length (along arm)</small></div>` +
-    `<div class="stat"><b>${i.OY.toFixed(1)} mm</b><small>width (${i.strapOut.toFixed(0)} with strap loops)</small></div>` +
+    `<div class="stat"><b>${i.OY.toFixed(1)} mm</b><small>width${i.strapOut > i.OY ? ' (' + i.strapOut.toFixed(0) + ' with strap loops)' : ''}</small></div>` +
     `<div class="stat"><b>${i.H.toFixed(1)} mm</b><small>height</small></div>` +
-    `<div class="stat"><b>~${Math.round(i.grams)} g</b><small>plastic (both parts)</small></div>`;
+    `<div class="stat"><b>~${Math.round(i.grams)} g</b><small>plastic (both parts)</small></div>` +
+    `<div class="stat wide"><b>≈ ${dur(i.fastMin)} · ${dur(i.stdMin)}</b><small>print time: fast printer (Bambu/Prusa MK4) · standard printer (Ender 3/MK3), 0.2 mm. Your slicer gives the exact time.</small></div>`;
+  for (const b of document.querySelectorAll('#style-seg button')) b.classList.toggle('on', b.dataset.style === P.style);
+  document.getElementById('style-note').textContent = P.style === 'frame'
+    ? 'Base plate + 4 pillars + top plate. Open sides, fastest to print. Electronics are visible.'
+    : 'Closed box with walls. Best protection, but takes about 3× longer to print.';
+}
+function dur(min) {
+  min = Math.round(min / 5) * 5;
+  return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '');
   document.getElementById('checks').innerHTML = model.checks.map(([ok, t]) => `<div class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${t}</div>`).join('');
 }
 
