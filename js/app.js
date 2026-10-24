@@ -1137,6 +1137,10 @@
     };
     $('btn-leave').onclick = () => leaveGame();
     $('btn-home').onclick = () => leaveGame();
+    $('btn-leave-game').onclick = () => modal('Leave this game?',
+      S.test ? 'This ends the test / demo.' : 'You can rejoin later from the start screen with the same code. The game keeps going for everyone else.', [
+        { label: 'Leave', cls: 'primary', fn: () => leaveGame() }, { label: 'Stay' }
+      ]);
     $('btn-demo').onclick = () => {
       SFU.Audio.unlock();
       modal('Judge demo (3 min)', 'A scripted round on the SFU Burnaby map with captions. Recommended: play as a hider so judges see powerups, pings and the wrist device.', [
@@ -1160,12 +1164,25 @@
     $('btn-recenter').onclick = () => { if (S.fix && S.map) S.map.setView([S.fix.lat, S.fix.lng], Math.max(S.map.getZoom(), 17)); };
     buildHostControls();
 
-    // Rejoin after a refresh
+    // After a refresh, offer to rejoin your last game (never jump in automatically).
+    // Games that should have finished long ago are forgotten.
+    $('btn-rejoin-forget').onclick = () => { try { localStorage.removeItem('sfu_code'); } catch (e) {} $('rejoin-card').hidden = true; };
     let saved = null;
     try { saved = localStorage.getItem('sfu_code'); } catch (e) {}
     if (saved && fbConfigured()) {
       ensureBackend().then(ok => ok && S.db.get('games/' + saved)).then(g => {
-        if (g && g.players && g.players[S.uid] && g.state !== 'ended') enterGame(saved);
+        if (!g || !g.players || !g.players[S.uid] || g.state === 'ended') { try { localStorage.removeItem('sfu_code'); } catch (e) {} return; }
+        const c = Object.assign({}, SFU.GAME_DEFAULTS, g.config || {});
+        const now = S.db.realNow();
+        const stale = g.state === 'running'
+          ? now - g.startedAt > (c.gameDurationMin + 15) * 60000      // should have ended by now
+          : now - (g.createdAt || 0) > 6 * 3600000;                  // lobby older than 6 h
+        if (stale) { try { localStorage.removeItem('sfu_code'); } catch (e) {} return; }
+        if (S.code) return;   // already in something else
+        $('rejoin-code').textContent = saved;
+        $('rejoin-info').textContent = g.state === 'running' ? 'The game is in progress.' : 'The game is still in the lobby.';
+        $('btn-rejoin').onclick = () => { $('rejoin-card').hidden = true; SFU.Audio.unlock(); enterGame(saved); };
+        $('rejoin-card').hidden = false;
       }).catch(() => {});
     }
   }

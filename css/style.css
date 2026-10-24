@@ -45,7 +45,8 @@ button.active { background: var(--red); color: #fff; border-color: var(--red); }
 .brand { font-size: 28px; font-weight: 800; margin: 16px auto 4px; }
 .logo { background: var(--red); color: #fff; padding: 2px 8px; border-radius: 6px; }
 .card { background: var(--bg2); border-radius: 12px; padding: 12px; margin: 12px auto; }
-.code { font-size: 32px; font-weight: 800; letter-spacing: 4px; color: var(--red); }
+.rejoin { border: 2px solid var(--red); background: #fff; }
+.code {font-size: 32px; font-weight: 800; letter-spacing: 4px; color: var(--red); }
 .chip { display: inline-block; padding: 4px 10px; border-radius: 99px; background: var(--bg2); font-size: 13px; }
 .badge { padding: 3px 10px; border-radius: 99px; background: var(--red); color: #fff; font-weight: 700; font-size: 13px; }
 .badge.hider { background: var(--ok); }

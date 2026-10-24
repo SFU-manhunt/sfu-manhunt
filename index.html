@@ -7,7 +7,7 @@
 <title>SFU Manhunt</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
 <div id="map"></div>
@@ -16,6 +16,15 @@
 <section id="screen-home" class="screen sheet full active">
   <div class="brand"><span class="logo">SFU</span> Manhunt</div>
   <p class="muted">Campus manhunt with a shrinking border, seeker pings and powerups.</p>
+
+  <div id="rejoin-card" class="card rejoin" hidden>
+    <div><b>You're still in game <span id="rejoin-code"></span></b></div>
+    <div class="muted small" id="rejoin-info"></div>
+    <div class="row">
+      <button id="btn-rejoin" class="primary">Rejoin</button>
+      <button id="btn-rejoin-forget">Forget it</button>
+    </div>
+  </div>
 
   <label>Your name <input id="in-name" maxlength="20" autocomplete="nickname"></label>
 
@@ -212,8 +221,9 @@
       <div id="inv"></div>
     </div>
     <div id="spec-list" class="list small" hidden></div>
-    <div id="host-panel" class="row" hidden>
-      <button id="btn-stop" class="danger small">Stop game (everyone)</button>
+    <div class="row">
+      <span id="host-panel" hidden><button id="btn-stop" class="danger small">Stop game (everyone)</button></span>
+      <button id="btn-leave-game" class="small">Leave game</button>
     </div>
   </div>
 
@@ -247,12 +257,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="js/config.js"></script>
-<script src="js/campus.js"></script>
-<script src="js/geo.js"></script>
-<script src="js/db.js"></script>
-<script src="js/sound.js"></script>
-<script src="js/app.js"></script>
-<script src="js/testmode.js"></script>
+<script src="js/config.js?v=12"></script>
+<script src="js/campus.js?v=12"></script>
+<script src="js/geo.js?v=12"></script>
+<script src="js/db.js?v=12"></script>
+<script src="js/sound.js?v=12"></script>
+<script src="js/app.js?v=12"></script>
+<script src="js/testmode.js?v=12"></script>
 </body>
 </html>
