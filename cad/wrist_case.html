@@ -33,6 +33,11 @@
   .grid { display: grid; grid-template-columns: 1fr 76px; gap: 4px 8px; align-items: center; margin-top: 6px; }
   .grid label { font-size: 12px; }
   .grid input { width: 76px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; }
+  .seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { flex: 1; border: 0; border-radius: 0; background: #fff; }
+  .seg button.on { background: var(--red); color: #fff; font-weight: 600; }
+  #style-note { margin-top: 6px; }
+  .stat.wide { grid-column: span 2; }
   #busy { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,.7); color: #fff; padding: 6px 10px; border-radius: 99px; font-size: 12px; }
   #legend { position: absolute; left: 12px; bottom: 12px; background: rgba(255,255,255,.92); border-radius: 10px; padding: 8px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.12); }
   #legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
@@ -50,6 +55,13 @@
   <div id="panel">
     <h1><span>SFU</span>Wrist Case</h1>
     <div class="muted">Arduino UNO R4 WiFi + Grove Base Shield, Grove 16×2 LCD, button and buzzer. Two printed parts: base and lid.</div>
+
+    <h2>Case style</h2>
+    <div class="seg" id="style-seg">
+      <button data-style="frame">Quick frame</button>
+      <button data-style="box">Full box</button>
+    </div>
+    <div class="muted" id="style-note"></div>
 
     <div class="stats" id="stats"></div>
 
@@ -116,6 +128,10 @@ const GROUPS = {
     ['btnHole', 'Button hole Ø', 7.5], ['btnSwitchH', 'Switch height', 5], ['btnDepth', 'Button module depth', 9],
     ['buzD', 'Buzzer Ø', 12], ['buzH', 'Buzzer height', 9], ['buzDepth', 'Buzzer module depth', 13], ['frameH', 'Holder wall height', 5]
   ],
+  'Quick frame': [
+    ['plateT', 'Base plate thickness', 2.4], ['pillarD', 'Corner pillar Ø', 6],
+    ['strapSlotFromEdge', 'Strap bar width', 4], ['lighten', 'Lightening cut-outs (1/0)', 1]
+  ],
   'Case': [
     ['innerX', 'Inside length', 89], ['innerY', 'Inside width', 66], ['wall', 'Wall', 2.2], ['floor', 'Floor', 2], ['lidT', 'Lid', 2],
     ['cornerR', 'Corner radius', 4], ['headroom', 'Spare height', 1], ['clr', 'Fit clearance', 0.4],
@@ -127,7 +143,7 @@ const GROUPS = {
 // Arduino Uno-format mounting holes (from the board corner on the USB edge)
 const ARD_HOLES = [[13.97, 2.54], [15.24, 50.8], [66.04, 7.62], [66.04, 35.56]];
 
-const P = {};
+const P = { style: 'frame' };
 for (const g of Object.values(GROUPS)) for (const [k, , v] of g) P[k] = v;
 try { Object.assign(P, JSON.parse(localStorage.getItem('wristCaseParams') || '{}')); } catch (e) {}
 
@@ -148,7 +164,8 @@ function rbox(x, y, z, r) {
 }
 
 function build(P) {
-  const W = P.wall, F = P.floor, LT = P.lidT, C = P.clr;
+  const frame = P.style === 'frame';            // quick frame = base plate + pillars + top plate, open sides
+  const W = P.wall, F = frame ? P.plateT : P.floor, LT = P.lidT, C = P.clr;
   const IX = P.innerX, IY = P.innerY;
   const IH = P.standoffH + P.pcbT + P.stackH + P.lcdDepth + P.headroom;   // inside height
   const OX = IX + 2 * W, OY = IY + 2 * W, BH = F + IH;                  // BH = top of base walls
@@ -161,8 +178,8 @@ function build(P) {
 
   // ---------- base ----------
   const adds = [], subs = [];
-  for (const [x, y] of bosses) {
-    adds.push(cyl(IH, 2 * P.bossR).translate([x, y, F - 0.01]));
+  for (const [x, y] of bosses) {   // lid screw posts (box) / corner pillars (frame)
+    adds.push(cyl(IH, frame ? P.pillarD : 2 * P.bossR).translate([x, y, F - 0.01]));
     subs.push(cyl(13, P.pilot).translate([x, y, BH - 12]));
   }
   for (const [hx, hy] of ARD_HOLES) {
@@ -170,17 +187,32 @@ function build(P) {
     adds.push(cyl(P.standoffH, 5.5).translate([x, y, F - 0.01]));
     subs.push(cyl(P.standoffH + 1.5, P.pilot).translate([x, y, F - 1]));
   }
-  const portZ = ard.z + P.pcbT - 1.5;
-  subs.push(cube(W + 2, P.usbW, P.usbH).translate([-1, ard.y + P.usbY - P.usbW / 2, portZ]));
-  if (P.dcHole) subs.push(cube(W + 2, P.dcW, P.dcH).translate([-1, ard.y + P.dcY - P.dcW / 2, portZ]));
-  // strap loops on both long sides (strap goes under the case, through the slots, around the wrist)
-  const L = P.strapW + 6, xL = (OX - L) / 2, depth = P.strapGap + P.strapBar, sh = P.strapH;
-  adds.push(cube(L, P.strapBar, sh).translate([xL, -depth, 0]));
-  adds.push(cube(3, depth + 0.6, sh).translate([xL, -depth, 0]), cube(3, depth + 0.6, sh).translate([xL + L - 3, -depth, 0]));
-  adds.push(cube(L, P.strapBar, sh).translate([xL, OY + P.strapGap, 0]));
-  adds.push(cube(3, depth + 0.6, sh).translate([xL, OY - 0.6, 0]), cube(3, depth + 0.6, sh).translate([xL + L - 3, OY - 0.6, 0]));
-
-  const shell = rbox(OX, OY, BH, P.cornerR).subtract(rbox(IX, IY, IH + 5, Math.max(0.5, P.cornerR - W)).translate([W, W, F]));
+  const depth = P.strapGap + P.strapBar;
+  let shell;
+  if (frame) {
+    // flat base plate; the strap goes under it, up through a slot, over the edge bar
+    shell = rbox(OX, OY, F, P.cornerR);
+    const sx = (OX - P.strapW) / 2, e = P.strapSlotFromEdge;
+    subs.push(cube(P.strapW, P.strapGap, F + 2).translate([sx, e, -1]));
+    subs.push(cube(P.strapW, P.strapGap, F + 2).translate([sx, OY - e - P.strapGap, -1]));
+    if (P.lighten) {   // save plastic where nothing is mounted
+      const yA = e + P.strapGap + 3.5, yB = OY - e - P.strapGap - 3.5;
+      subs.push(rbox(40, yB - yA, F + 2, 4).translate([ard.x + 20, yA, -1]));
+      const xr = ard.x + P.ardX + 3, xr2 = OX - W - P.bossAt - P.pillarD / 2 - 3;
+      if (xr2 - xr > 8) subs.push(rbox(xr2 - xr, yB - yA, F + 2, 3).translate([xr, yA, -1]));
+    }
+  } else {
+    shell = rbox(OX, OY, BH, P.cornerR).subtract(rbox(IX, IY, IH + 5, Math.max(0.5, P.cornerR - W)).translate([W, W, F]));
+    const portZ = ard.z + P.pcbT - 1.5;
+    subs.push(cube(W + 2, P.usbW, P.usbH).translate([-1, ard.y + P.usbY - P.usbW / 2, portZ]));
+    if (P.dcHole) subs.push(cube(W + 2, P.dcW, P.dcH).translate([-1, ard.y + P.dcY - P.dcW / 2, portZ]));
+    // strap loops on both long sides (strap goes under the case, through the slots, around the wrist)
+    const L = P.strapW + 6, xL = (OX - L) / 2, sh = P.strapH;
+    adds.push(cube(L, P.strapBar, sh).translate([xL, -depth, 0]));
+    adds.push(cube(3, depth + 0.6, sh).translate([xL, -depth, 0]), cube(3, depth + 0.6, sh).translate([xL + L - 3, -depth, 0]));
+    adds.push(cube(L, P.strapBar, sh).translate([xL, OY + P.strapGap, 0]));
+    adds.push(cube(3, depth + 0.6, sh).translate([xL, OY - 0.6, 0]), cube(3, depth + 0.6, sh).translate([xL + L - 3, OY - 0.6, 0]));
+  }
   const base = U([shell, ...adds]).subtract(U(subs));
 
   // ---------- lid ----------
@@ -189,7 +221,7 @@ function build(P) {
   let lip = rbox(IX - 2 * C, IY - 2 * C, lipH, Math.max(0.3, P.cornerR - W - C)).translate([W + C, W + C, BH - lipH])
     .subtract(rbox(IX - 2 * C - 2 * lipT, IY - 2 * C - 2 * lipT, lipH + 1, 0.3).translate([W + C + lipT, W + C + lipT, BH - lipH - 0.5]));
   lip = lip.subtract(U(bosses.map(([x, y]) => cyl(lipH + 2, 2 * (P.bossR + C + 0.3)).translate([x, y, BH - lipH - 1]))));
-  ladds.push(lip);
+  if (!frame) ladds.push(lip);   // the lip locates the lid inside the box walls; the frame has no walls
   for (const [x, y] of bosses) {
     lsubs.push(cyl(LT + lipH + 2, P.clear).translate([x, y, BH - lipH - 1]));
     lsubs.push(cyl(1.81, P.clear, P.head).translate([x, y, BH + LT - 1.8]));
@@ -255,12 +287,19 @@ function build(P) {
   for (const k of ['lcd', 'button', 'buzzer']) if (clash(ghosts[k], ghosts.stack)) checks.push([false, name[k] + ' hits the shield/cables (make the case taller)']);
   if (clash(ghosts.button, ghosts.buzzer) || clash(ghosts.button, ghosts.lcd) || clash(ghosts.buzzer, ghosts.lcd)) checks.push([false, 'Lid parts overlap each other']);
   if (!checks.length) checks.push([true, 'All parts fit, nothing collides']);
-  checks.push([true, 'USB-C reachable through the end wall' + (P.dcHole ? ' (+ barrel jack hole)' : '')]);
-  checks.push([true, 'Strap: ' + P.strapW + ' mm wide velcro band through the side loops']);
+  if (frame) {
+    checks.push([true, 'Open sides: USB-C, wiring and the Grove cables are easy to reach']);
+    checks.push([true, 'Strap: up to ' + P.strapW + ' mm velcro band through the two slots in the base plate']);
+  } else {
+    checks.push([true, 'USB-C reachable through the end wall' + (P.dcHole ? ' (+ barrel jack hole)' : '')]);
+    checks.push([true, 'Strap: ' + P.strapW + ' mm wide velcro band through the side loops']);
+  }
 
-  const grams = (base.volume() + lid.volume()) / 1000 * 1.24;
+  // Plastic and rough print time. Thin parts print nearly solid; a typical
+  // fast printer lays down ~30 g/h, a standard one ~14 g/h at 0.2 mm.
+  const grams = (base.volume() + lid.volume()) / 1000 * 1.24 * 0.85;
   return { base, lid, lidPrint, ghosts, checks,
-    info: { OX, OY, H: BH + LT, strapOut: OY + 2 * depth, grams } };
+    info: { OX, OY, H: BH + LT, strapOut: frame ? OY : OY + 2 * depth, grams, fastMin: grams / 30 * 60, stdMin: grams / 14 * 60 } };
 }
 
 // ---------------------------------------------------------------- three.js view
