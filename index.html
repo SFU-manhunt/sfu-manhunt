@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#A6192E">
+<title>SFU Manhunt</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="map"></div>
+
+<!-- ============ HOME ============ -->
+<section id="screen-home" class="screen sheet full active">
+  <div class="brand"><span class="logo">SFU</span> Manhunt</div>
+  <p class="muted">Campus manhunt with a shrinking border, seeker pings and powerups.</p>
+
+  <label>Your name <input id="in-name" maxlength="20" autocomplete="nickname"></label>
+
+  <div class="card">
+    <button id="btn-create" class="primary wide">Create game</button>
+    <label class="check"><input type="checkbox" id="in-spectate"> Host only (spectate, don't play)</label>
+  </div>
+
+  <div class="card">
+    <label>Game code <input id="in-code" maxlength="5" autocapitalize="characters" autocomplete="off"></label>
+    <button id="btn-join" class="wide">Join game</button>
+  </div>
+
+  <div class="card">
+    <button id="btn-test" class="wide">Test mode (no Firebase, no GPS)</button>
+    <p class="muted small">Simulated players on the Burnaby map. Drag the blue dot (or use WASD) to move. Walk onto 🛡️/🎭 to collect powerups.</p>
+  </div>
+
+  <p id="home-msg" class="msg"></p>
+  <p id="fb-warn" class="muted small" hidden>Firebase isn't set up yet, so edit <code>js/config.js</code> (see README). Test mode still works.</p>
+</section>
+
+<!-- ============ LOBBY ============ -->
+<section id="screen-lobby" class="screen sheet">
+  <div class="row between">
+    <div><div class="muted small">Game code</div><div id="lobby-code" class="code"></div></div>
+    <button id="btn-leave" class="small">Leave</button>
+  </div>
+  <div id="lobby-gps" class="chip">GPS: waiting…</div>
+  <div id="device-row">
+    <label>Chest device ID (optional, hiders) <input id="in-device" maxlength="32" placeholder="e.g. chest-01" autocomplete="off" autocapitalize="off"></label>
+    <div id="device-status" class="muted small"></div>
+  </div>
+
+  <h3>Players</h3>
+  <ul id="lobby-players" class="list"></ul>
+  <p id="guest-msg" class="muted">Waiting for the host to start…</p>
+
+  <div id="host-controls" hidden>
+    <h3>Play area</h3>
+    <label>Campus <select id="cfg-campus"></select></label>
+    <label>Shape
+      <select id="cfg-shape">
+        <option value="polygon">Campus outline (polygon)</option>
+        <option value="circle">Circle around the final point</option>
+      </select>
+    </label>
+    <label id="row-radius">Circle radius (m) <input type="number" id="cfg-radius" min="50" step="50"></label>
+    <label>Final safe zone <select id="cfg-final"></select></label>
+
+    <div class="muted small">Map tool:</div>
+    <div id="tool-btns" class="seg">
+      <button data-tool="none" class="active">Pan</button>
+      <button data-tool="final">Set final point</button>
+      <button data-tool="area">Draw area</button>
+      <button data-tool="off">Draw off-limits</button>
+    </div>
+    <div id="draw-controls" class="row" hidden>
+      <span id="draw-hint" class="muted small"></span>
+      <button id="btn-draw-undo" class="small">Undo</button>
+      <button id="btn-draw-cancel" class="small">Cancel</button>
+      <button id="btn-draw-finish" class="small primary">Finish</button>
+    </div>
+    <div class="row">
+      <button id="btn-use-loc" class="small">Final point = my location</button>
+      <button id="btn-clear-off" class="small">Clear off-limits</button>
+      <button id="btn-export" class="small">Copy area as code</button>
+    </div>
+
+    <h3>Rules</h3>
+    <div id="cfg-grid" class="grid"></div>
+    <label>Meeting point (shown if the game is stopped) <input id="cfg-meeting" maxlength="60"></label>
+
+    <p id="lobby-msg" class="msg"></p>
+    <button id="btn-start" class="primary wide">Start game</button>
+  </div>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="screen-game" class="screen overlay">
+  <div id="hud-top" class="hud">
+    <div class="row between">
+      <span id="hud-role" class="badge"></span>
+      <span id="hud-time" class="mono"></span>
+      <span id="hud-alive" class="small"></span>
+    </div>
+    <div id="hud-zone" class="small"></div>
+  </div>
+
+  <div id="warn" class="warn" hidden></div>
+  <div id="pick-bar" class="warn soft" hidden>
+    Tap the map where your fake ping should appear
+    <button id="btn-pick-cancel" class="small">Cancel</button>
+  </div>
+
+  <div id="test-panel" class="hud test" hidden>
+    <div class="row">
+      <span class="small">Test speed:</span>
+      <button class="small scale active" data-scale="1">1×</button>
+      <button class="small scale" data-scale="5">5×</button>
+      <button class="small scale" data-scale="20">20×</button>
+      <button class="small scale" data-scale="60">60×</button>
+    </div>
+    <button id="btn-chest" class="small wide" hidden>Press chest button</button>
+  </div>
+
+  <div id="hud-bottom" class="hud">
+    <div id="seeker-panel" hidden>
+      <div id="ping-main" class="hint-main">--</div>
+      <div id="ping-sub" class="small muted"></div>
+      <div class="row">
+        <button id="btn-tag" class="primary">Tag</button>
+      </div>
+    </div>
+    <div id="hider-panel" hidden>
+      <div id="hider-msg"></div>
+      <div id="hider-ping" class="mono small"></div>
+      <div id="effects"></div>
+      <div id="inv"></div>
+    </div>
+    <div id="spec-list" class="list small" hidden></div>
+    <div id="host-panel" class="row" hidden>
+      <button id="btn-stop" class="danger small">Stop game (everyone)</button>
+    </div>
+  </div>
+
+  <button id="btn-recenter" class="fab" title="Center on me">◎</button>
+</section>
+
+<!-- ============ END ============ -->
+<section id="screen-end" class="screen sheet full">
+  <h1 id="end-title"></h1>
+  <p id="end-body"></p>
+  <ul id="end-list" class="list"></ul>
+  <button id="btn-home" class="wide">Back to start</button>
+</section>
+
+<!-- ============ MODAL / TOAST ============ -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div id="modal-actions" class="row"></div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="js/config.js"></script>
+<script src="js/campus.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/db.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/app.js"></script>
+<script src="js/testmode.js"></script>
+</body>
+</html>

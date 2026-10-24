@@ -1,0 +1,8 @@
+{
+  "name": "SFU Manhunt",
+  "short_name": "Manhunt",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#A6192E"
+}
