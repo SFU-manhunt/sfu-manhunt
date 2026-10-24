@@ -41,6 +41,68 @@
 
   <p id="home-msg" class="msg"></p>
   <p id="fb-warn" class="muted small" hidden>Firebase isn't set up yet, so edit <code>js/config.js</code> (see README). Test mode still works.</p>
+
+  <section id="judging" class="judging">
+    <h2>Judging</h2>
+    <p class="lead">SFU Manhunt is a campus-wide game of hide-and-seek on Burnaby Mountain. Hiders and a seeker play on their iPhones, the play area shrinks over time, and every hider wears a wrist device we built with an Arduino.</p>
+    <button id="btn-demo-judging" class="primary wide">Watch the 3-minute demo</button>
+
+    <h3>How a round works</h3>
+    <ol>
+      <li><b>Lobby:</b> the host creates a game, players join with a 5-letter code, and the host picks the seeker.</li>
+      <li><b>Hiding:</b> hiders get a head start to scatter across campus.</li>
+      <li><b>Hunt:</b> the seeker uses pings to find hiders and tags them in person.</li>
+      <li><b>End:</b> the seeker wins by catching everyone. The hiders win if anyone survives the clock.</li>
+    </ol>
+
+    <h3>Game features</h3>
+    <ul>
+      <li><b>Live GPS map:</b> every phone shares its position in real time.</li>
+      <li><b>Pings:</b> every 3 minutes the seeker sees all hiders for 30 seconds (the dots fade out).</li>
+      <li><b>Faster pings:</b> if nobody is caught for 12.5 minutes, pings come every minute. After 15 minutes they come every 30 seconds until someone is caught.</li>
+      <li><b>Shrinking zone:</b> an SFU-shaped border closes in stages toward a final point. Stay outside too long and you're eliminated (with GPS-error buffers so it's fair).</li>
+      <li><b>Off-limits areas:</b> roads and forest edges drawn on the map for safety.</li>
+      <li><b>Tagging:</b> the seeker tags a hider within 30 m, and the hider confirms on their phone.</li>
+      <li><b>Safety:</b> the host can stop the game for everyone and send them to a meeting point.</li>
+    </ul>
+
+    <h3>AI-placed powerups (hiders)</h3>
+    <ul>
+      <li><b>🛡️ Shield:</b> you're hidden from the next ping.</li>
+      <li><b>🎭 Decoy:</b> the next ping shows you wherever you choose.</li>
+      <li><b>🧭 Border Pass:</b> leave the shrunken zone for 90 seconds (but not the original border).</li>
+      <li><b>The placement AI</b> scores dozens of candidate spots and picks the best one: inside the zone, away from the seeker, about 120 m from hiders so it's worth the risk, and spread out near campus landmarks.</li>
+    </ul>
+
+    <h3>The wrist device</h3>
+    <ul>
+      <li><b>Hardware:</b> Arduino UNO R4 WiFi, Grove Base Shield, 16×2 I2C LCD, button and buzzer, in a 3D-printed case on a strap.</li>
+      <li><b>Screen:</b> shows the game stage, when the ring closes and for how long, and how many players are left.</li>
+      <li><b>Buzzer:</b> buzzes when the ring starts closing, when a hider is caught, and when a ping reveals you.</li>
+      <li><b>Button:</b> tap to choose a powerup, hold to use it, with no need to take out your phone.</li>
+      <li><b>Connection:</b> it connects through the wearer's iPhone hotspot and syncs its clock with the game server.</li>
+    </ul>
+
+    <h3>How it's built</h3>
+    <ul>
+      <li><b>Game app:</b> a web app (HTML/JavaScript) that runs in Safari on any iPhone, with nothing to install. Hosted on GitHub Pages.</li>
+      <li><b>Real-time backend:</b> Firebase Realtime Database with anonymous sign-in and security rules.</li>
+      <li><b>Map:</b> Leaflet with OpenStreetMap, using a custom SFU Burnaby campus outline and landmarks.</li>
+      <li><b>Device firmware:</b> Arduino C++ over HTTPS (WiFiS3, ArduinoHttpClient, ArduinoJson).</li>
+      <li><b>Case:</b> a parametric CAD model generated in the browser, with an automatic fit check for every part. <a href="cad/wrist_case.html" target="_blank" rel="noopener">Open the 3D case designer</a></li>
+    </ul>
+
+    <h3>How the pieces talk</h3>
+    <div class="flow">
+      <span>iPhones<br><small>game app</small></span>
+      <i>⇄</i>
+      <span>Firebase<br><small>live game data</small></span>
+      <i>⇄</i>
+      <span>Wrist device<br><small>via iPhone hotspot</small></span>
+    </div>
+
+    <p class="muted small">Built for SFU. Every number (ping timing, zone speed, powerup rate) can be tuned by the host in the lobby.</p>
+  </section>
 </section>
 
 <!-- ============ LOBBY ============ -->

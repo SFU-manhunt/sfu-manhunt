@@ -1145,6 +1145,7 @@
         { label: 'Cancel' }
       ]);
     };
+    $('btn-demo-judging').onclick = () => { SFU.Audio.unlock(); startDemo('hider'); };
     $('btn-demo-again').onclick = () => { const r = SFU.Test.role; leaveGame(); startDemo(r); };
     $('in-demo-device').onchange = e => linkDevice(e.target.value);
     $('btn-tag').onclick = openTagModal;

@@ -83,6 +83,17 @@ button.active { background: var(--red); color: #fff; border-color: var(--red); }
 .small-input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #555; background: #222; color: #fff; font-size: 13px; margin-top: 6px; }
 .test label.check { margin: 6px 0; }
 
+.judging { border-top: 3px solid var(--red); margin-top: 28px; padding-top: 8px; }
+.judging h2 { font-size: 22px; margin: 12px 0 6px; color: var(--red); letter-spacing: .02em; }
+.judging h3 { font-size: 15px; margin: 18px 0 4px; }
+.judging .lead { font-size: 16px; line-height: 1.45; }
+.judging ul, .judging ol { padding-left: 20px; margin: 4px 0; }
+.judging li { margin: 5px 0; line-height: 1.4; font-size: 14px; }
+.judging a { color: var(--red); font-weight: 600; }
+.judging .flow { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--bg2); border-radius: 12px; padding: 12px; text-align: center; font-weight: 700; font-size: 14px; }
+.judging .flow span { flex: 1; }
+.judging .flow small { font-weight: 400; color: var(--muted); }
+.judging .flow i { font-style: normal; color: var(--red); font-size: 20px; }
 .demo-caption { position: absolute; left: 50%; transform: translateX(-50%); top: 96px; width: min(560px, calc(100% - 16px)); background: rgba(20,20,20,.92); color: #fff; padding: 12px 16px; border-radius: 14px; font-size: 16px; line-height: 1.35; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,.3); border-left: 5px solid var(--red); animation: capIn .35s ease-out; }
 @keyframes capIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 #demo-features li span:first-child { font-weight: 600; }
