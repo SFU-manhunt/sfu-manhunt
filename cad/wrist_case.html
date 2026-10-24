@@ -128,6 +128,11 @@ const GROUPS = {
     ['btnHole', 'Button hole Ø', 7.5], ['btnSwitchH', 'Switch height', 5], ['btnDepth', 'Button module depth', 9],
     ['buzD', 'Buzzer Ø', 12], ['buzH', 'Buzzer height', 9], ['buzDepth', 'Buzzer module depth', 13], ['frameH', 'Holder wall height', 5]
   ],
+  'Arduino clips': [
+    ['clips', 'Snap clips over the board (1/0)', 1], ['clipX1', 'Clip position 1 (from USB end)', 8],
+    ['clipX2', 'Clip position 2 (from USB end)', 67], ['clipW', 'Clip width', 6], ['clipT', 'Clip arm thickness', 1.6],
+    ['clipLip', 'Clip overhang onto board', 1.0]
+  ],
   'Quick frame': [
     ['plateT', 'Base plate thickness', 2.4], ['pillarD', 'Corner pillar Ø', 6],
     ['strapSlotFromEdge', 'Strap bar width', 4], ['lighten', 'Lightening cut-outs (1/0)', 1]
@@ -187,6 +192,25 @@ function build(P) {
     adds.push(cyl(P.standoffH, 5.5).translate([x, y, F - 0.01]));
     subs.push(cyl(P.standoffH + 1.5, P.pilot).translate([x, y, F - 1]));
   }
+  // Snap clips: flexible arms on both long edges whose angled lips hook over the
+  // board, so the Arduino clicks in and can't fall out (screws optional).
+  if (P.clips) {
+    const armH = P.standoffH + P.pcbT + 0.2, zLip = F + armH;   // lip starts just above the board top
+    for (const cx of [P.clipX1, P.clipX2]) {
+      const x0 = ard.x + cx - P.clipW / 2;
+      for (const side of [0, 1]) {
+        const yArm = side ? ard.y + P.ardY + C : ard.y - C - P.clipT;   // arm sits just outside the board edge
+        adds.push(cube(P.clipW, P.clipT, armH + 1.6).translate([x0, yArm, F - 0.01]));
+        // angled lip: wide at the bottom (holds the board), slopes back so the board can snap in from above
+        const yIn = side ? ard.y + P.ardY - P.clipLip : yArm, wIn = P.clipT + C + P.clipLip;
+        adds.push(Manifold.hull([
+          cube(P.clipW, wIn, 0.01).translate([x0, side ? yIn : yArm, zLip]),
+          cube(P.clipW, P.clipT, 0.01).translate([x0, yArm, zLip + 1.6])
+        ]));
+      }
+    }
+  }
+
   const depth = P.strapGap + P.strapBar;
   let shell;
   if (frame) {
@@ -258,7 +282,8 @@ function build(P) {
   const ghosts = {
     board: U([cube(P.ardX, P.ardY, P.pcbT).translate([ard.x, ard.y, ard.z]),
               cube(9, 9, 3.3).translate([ard.x - 1, ard.y + P.usbY - 4.5, ard.z + P.pcbT])]),
-    stack: cube(P.ardX, P.ardY, P.stackH).translate([ard.x, ard.y, ard.z + P.pcbT]),
+    // headers sit ~1.3 mm in from the long edges, so the shield/cable volume starts there
+    stack: cube(P.ardX, P.ardY - 2.6, P.stackH).translate([ard.x, ard.y + 1.3, ard.z + P.pcbT]),
     lcd: U([
       cube(P.lcdGlassX, P.lcdGlassY, P.lcdGlass).translate([lcd.x + (P.lcdX - P.lcdGlassX) / 2, lcd.y + (P.lcdY - P.lcdGlassY) / 2, BH - P.lcdGlass]),
       cube(P.lcdX, P.lcdY, P.pcbT).translate([lcd.x, lcd.y, BH - P.lcdGlass - P.pcbT]),
@@ -287,6 +312,7 @@ function build(P) {
   for (const k of ['lcd', 'button', 'buzzer']) if (clash(ghosts[k], ghosts.stack)) checks.push([false, name[k] + ' hits the shield/cables (make the case taller)']);
   if (clash(ghosts.button, ghosts.buzzer) || clash(ghosts.button, ghosts.lcd) || clash(ghosts.buzzer, ghosts.lcd)) checks.push([false, 'Lid parts overlap each other']);
   if (!checks.length) checks.push([true, 'All parts fit, nothing collides']);
+  checks.push([true, P.clips ? 'Arduino snaps into 4 clips (can\'t fall out); 4 M3 screws optional' : 'Arduino held by 4 M3 screws']);
   if (frame) {
     checks.push([true, 'Open sides: USB-C, wiring and the Grove cables are easy to reach']);
     checks.push([true, 'Strap: up to ' + P.strapW + ' mm velcro band through the two slots in the base plate']);
