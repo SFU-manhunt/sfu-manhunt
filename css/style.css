@@ -10,6 +10,7 @@
   --warn: #d97706;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg2); }
 #map { position: fixed; inset: 0; z-index: 0; }
 
@@ -75,10 +76,18 @@ button.active { background: var(--red); color: #fff; border-color: var(--red); }
 
 .fab { position: absolute; right: 12px; bottom: 50vh; width: 44px; height: 44px; border-radius: 50%; font-size: 20px; padding: 0; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 
-.test { top: 96px; left: auto; width: 230px; background: rgba(30,30,30,.9); color: #fff; }
+.test { top: 210px; left: auto; width: 230px; background: rgba(30,30,30,.9); color: #fff; }
 .test button { background: #333; color: #fff; border-color: #555; }
 .test button.active { background: var(--red); }
-#btn-chest { margin-top: 6px; }
+#btn-wrist { margin-top: 6px; }
+.small-input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #555; background: #222; color: #fff; font-size: 13px; margin-top: 6px; }
+.test label.check { margin: 6px 0; }
+
+.demo-caption { position: absolute; left: 50%; transform: translateX(-50%); top: 96px; width: min(560px, calc(100% - 16px)); background: rgba(20,20,20,.92); color: #fff; padding: 12px 16px; border-radius: 14px; font-size: 16px; line-height: 1.35; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,.3); border-left: 5px solid var(--red); animation: capIn .35s ease-out; }
+@keyframes capIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#demo-features li span:first-child { font-weight: 600; }
+#demo-features .yes { color: var(--ok); }
+#demo-features .no { color: var(--muted); }
 
 #inv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 #effects { color: var(--ok); font-weight: 600; font-size: 13px; margin-top: 4px; }

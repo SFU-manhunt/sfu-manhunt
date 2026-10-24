@@ -8,7 +8,7 @@
 
   // ---- Firebase Realtime Database (real games) ----
   SFU.makeFirebaseDb = cfg => {
-    firebase.initializeApp(cfg);
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
     const db = firebase.database();
     let offset = 0;
     db.ref('.info/serverTimeOffset').on('value', s => { offset = s.val() || 0; });
@@ -70,6 +70,7 @@
       realNow: () => Date.now(),
       get scale() { return scale; },
       setScale(n) { simBase = this.now(); realBase = Date.now(); scale = n; },
+      syncTo(now) { simBase = now; realBase = Date.now(); },   // match another clock (e.g. Firebase)
       on(path, cb) {
         const l = { path, cb, last: undefined };
         listeners.push(l);

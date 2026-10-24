@@ -9,7 +9,8 @@ This is a **base version**. Expect to tweak coordinates and timings once you've 
 | Feature | How it works |
 |---|---|
 | GPS tracker | Each phone uploads its position every ~4 s. Hiders see only themselves; spectators see everyone. |
-| Pings | When hiding time ends, and then every 3 min, the seeker's map shows every alive hider as a red dot for 60 s. Hiders get a sound and a message each time they're pinged. |
+| Pings | When hiding time ends, and then every 3 min, the seeker's map shows every alive hider as a red dot for 30 s (fading out from 25 s). Hiders get a sound and a message each time they're pinged. |
+| Faster pings | If the seeker catches nobody for 12.5 min, pings come every 1 min. After 15 min they come every 30 s and stay there until someone is caught, which resets to normal. |
 | Shrinking zone | The SFU Burnaby outline (or a circle) shrinks in steps toward a final point such as Convocation Mall. A dashed line shows the next zone. |
 | Border elimination | If you're outside for 3 GPS readings in a row (with a 15 m buffer), a 30 s countdown starts. Indoors (poor GPS) you get double time. Off-limits zones count as outside. |
 | Tagging | The seeker taps **Tag**, picks a hider within 30 m, and the hider confirms on their phone. |
@@ -17,7 +18,7 @@ This is a **base version**. Expect to tweak coordinates and timings once you've 
 | 🛡️ Shield | You're left off the next ping. |
 | 🎭 Decoy | You tap anywhere on the map, and the next ping shows you there instead. |
 | 🧭 Border Pass | For 90 s you may leave the shrunken zone, as long as you stay inside the **original** border from the start of the game. Off-limits zones still count. |
-| Chest device | An Arduino UNO R4 WiFi on your chest with a Grove LCD, button and buzzer. It shows the time to the next ping and to the next zone change, how many hiders are alive, and your powerups. Tap to pick a powerup, hold to use it. It beeps when a ping reveals you. See section 5. In Test mode, "Press chest button" acts like a hold. |
+| Wrist device | An Arduino UNO R4 WiFi on your wrist with a Grove LCD, button and buzzer. It shows the game stage, when the ring closes and for how long, and how many people are left. It buzzes when the ring starts closing, when a hider is out, and when a ping reveals you. Tap to pick a powerup, hold to use it. See section 5. In Test mode, "Hold wrist button" does the same as a hold. |
 | Safety | The host can press **Stop game**, which ends the game for everyone and tells them where to meet. |
 | Test mode | Simulated players (they collect and use powerups too), a draggable "you" dot and 1×–60× speed. No Firebase or GPS needed. |
 
@@ -44,7 +45,7 @@ js/db.js                   Firebase / in-memory backends
 js/sound.js                ping sounds
 js/app.js                  UI and game logic
 js/testmode.js             bots for desk testing
-firmware/chest_device_r4/  Arduino UNO R4 WiFi chest device sketch (Grove LCD, button, buzzer)
+firmware/wrist_device_r4/  Arduino UNO R4 WiFi wrist device sketch (Grove LCD, button, buzzer)
 database.rules.json        Firebase security rules
 ```
 
@@ -56,11 +57,31 @@ python -m http.server 8080
 
 Open http://localhost:8080 and click **Test mode**. Drag the blue dot (or use WASD), walk onto 🛡️/🎭 to collect them, and use the speed buttons. Play as a hider to see SeekerBot get fooled by your decoys and shields.
 
+### Judge demo (3-minute rounds)
+
+On the home screen, tap **Judge demo (3 min)**, then **Play as hider** (recommended) or **Watch everyone**. It's a scripted round on the SFU Burnaby map with simulated players and captions explaining each feature as it happens. No GPS, walking or second phone needed.
+
+| Time | What happens |
+|---|---|
+| 0:00 | Intro, then hiding phase (15 s) |
+| 0:15 | First **ping**, then one every 20 s |
+| ~0:18 | A **Shield** drops near you. Autopilot walks you to it, and the "wrist button" uses it, so the next ping misses you. |
+| 0:40 | The **ring starts closing** |
+| ~0:50 | **Drifter** leaves the zone and is eliminated |
+| ~1:00 | A **Border Pass** drops and gets used |
+| 1:30 / 2:00 | No catch, so **pings speed up** (every 10 s, then every 6 s) |
+| ~2:10 | SeekerBot **tags** a hider, and pings reset to normal |
+| 3:00 | Time's up, **Hiders win**, and a summary lists every feature shown |
+
+- **Autopilot** (on by default) walks you around so the presenter can just talk. Untick it to drag the blue dot yourself.
+- **Wrist device:** type its ID into the demo panel and it reacts live (timers, buzzes, powerups). The demo syncs its clock with Firebase for this.
+- **Run the demo again** on the summary screen starts the next round instantly.
+
 ## 2. Firebase (done)
 
 The project `sfu-manhunt` is set up: anonymous sign-in is on and the config is in `js/config.js`.
 
-**Re-publish the rules:** they changed for powerups and the chest button. In Realtime Database, open the **Rules** tab, paste [`database.rules.json`](database.rules.json) again, and click **Publish**.
+**Re-publish the rules:** they changed for powerups and the wrist device. In Realtime Database, open the **Rules** tab, paste [`database.rules.json`](database.rules.json) again, and click **Publish**.
 
 Old games stay in the database. Delete the `games` node in the console now and then.
 
@@ -81,25 +102,36 @@ To update the site later, upload the changed files again the same way. Or instal
 - Tap the screen once after opening the game so ping sounds can play. iPhones don't support vibration from web pages.
 - Optional: Share → **Add to Home Screen** for a full-screen app.
 
-## 5. Chest device (Arduino UNO R4 WiFi + Grove)
+## 5. Wrist device (Arduino UNO R4 WiFi + Grove)
 
-Each hider wears an Arduino UNO R4 WiFi with a Grove Base Shield in a 3D-printed case on an elastic strap. The 16×2 LCD shows:
+Each hider wears an Arduino UNO R4 WiFi with a Grove Base Shield on the wrist, in a 3D-printed case with a strap. The 16×2 LCD shows:
 
 ```
-PING 2:53    ☺4/5      <- line 1, always: time to next ping + hiders alive
-Zone shrink 9:42       <- line 2 rotates every 3 s between:
->SHIELD          1/3   <-   the zone timer (or "CLOSING! 0:40" / "Hiding 2:10" / "Final zone"),
-HIDDEN PASS 1:25       <-   your selected powerup, and active effects (if any)
+STAGE 2/7   ☺4/5       <- line 1: game stage + people left
+Ring closes 4:10       <- line 2: when the ring starts closing
+```
+While the ring is shrinking:
+```
+RING CLOSING☺4/5
+Done in     0:40       <- how long until it finishes closing
 ```
 
-- **Tap** the button to choose the next powerup (line 2 stays on it for 5 s). **Hold** it (0.7 s) to use the selected one. A decoy used from the device is placed automatically 150–400 m from you.
-- On the RGB Grove LCD the backlight is green when playing, orange while the zone is closing, red when you're pinged, and grey when you're out.
+- **Line 1, game stage:** `HIDING`, then `STAGE 1/7`, `STAGE 2/7`… (each shrink moves to the next stage), `RING CLOSING` while it shrinks, `FINAL STAGE`, then `HIDERS WIN!` / `SEEKER WINS` / `GAME OVER`.
+- **People left (☺4/5):** hiders still in the game (green). When someone turns red (tagged or out of the zone), the count drops and the screen shows **HIDER OUT**.
+- **Line 2:** mostly the ring timer. Every few seconds it also shows `Next ping 1:23` and your selected powerup. While the ring is closing and during hiding time, it stays on the timer.
+- **Button:** **tap** to show and choose the next powerup (line 2 stays on it for 5 s), **hold** for 0.7 s to use it. A decoy used from the device is placed automatically 150–400 m from you.
+- **Backlight (RGB Grove LCD):** blue while hiding, green while playing, orange while the ring closes, red when someone is out or you're pinged, and grey when you're out.
 - **Buzzer:**
-  - 3 long beeps + "PINGED!" means the seeker saw your location.
-  - 2 beeps means they saw your decoy.
-  - 1 short beep means your shield blocked the ping.
-  - A tiny chirp 10 s before every ping.
-  - A long beep when you're out.
+
+  | Sound | Meaning |
+  |---|---|
+  | 4 short beeps + **RING CLOSING!** | The ring is starting to close |
+  | 2 beeps + **HIDER OUT** | A hider was tagged or eliminated |
+  | 3 long beeps + **PINGED!** | The seeker saw your location |
+  | 2 beeps + **PINGED (DECOY)** | They saw your decoy |
+  | 1 short beep + **PING BLOCKED** | Your shield hid you |
+  | 1 long beep | You're out |
+
 - It also shows the lobby, "YOU'RE OUT", the winner and the meeting point, plus "phone app offline" if the phone stops updating it.
 
 **How it connects:** the R4 joins the wearer's **iPhone hotspot** over Wi-Fi. The wearer's game app writes a small summary to `devices/<DEVICE_ID>/state` in Firebase whenever something changes. The device reads it every 3 s. When you use a powerup, the device writes `devices/<DEVICE_ID>/cmd`, and the phone carries it out. Bluetooth isn't used, because web pages on iPhone can't use it.
@@ -123,9 +155,9 @@ HIDDEN PASS 1:25       <-   your selected powerup, and active effects (if any)
    - **ArduinoHttpClient** (by Arduino)
    - **ArduinoJson** (by Benoit Blanchon, version 7)
    - **Grove - LCD RGB Backlight** (by Seeed Studio). Use **LiquidCrystal I2C** instead only if `LCD_TYPE_GROVE` is 0.
-4. Open [firmware/chest_device_r4/chest_device_r4.ino](firmware/chest_device_r4/chest_device_r4.ino) and edit the CONFIG block:
+4. Open [firmware/wrist_device_r4/wrist_device_r4.ino](firmware/wrist_device_r4/wrist_device_r4.ino) and edit the CONFIG block:
    - `WIFI_SSID` / `WIFI_PASS`: the wearer's hotspot name and password. The name is in Settings → General → About → Name.
-   - `DEVICE_ID`: a different ID for each device, e.g. `chest-01`, `chest-02`.
+   - `DEVICE_ID`: a different ID for each device, e.g. `wrist-01`, `wrist-02`.
 5. Connect the R4 by USB-C, choose **Tools → Board → Arduino UNO R4 WiFi** and its port, then click **Upload**.
 6. **Tools → Serial Monitor** (115200 baud) shows "Signed in to Firebase".
 
@@ -139,8 +171,8 @@ Troubleshooting:
 
 ### Pair it in the game
 1. The device shows **NOT PAIRED** and its ID.
-2. In the lobby, type that ID into **Chest device ID**. The device switches to **LOBBY**.
-3. Hold the device button. The phone shows "Chest device works!".
+2. In the lobby, type that ID into **Wrist device ID**. The device switches to **LOBBY**.
+3. Hold the device button. The phone shows "Wrist device works!".
 
 The game app must stay open on the phone, because the phone is what keeps the device updated. It needs to stay open anyway for GPS.
 

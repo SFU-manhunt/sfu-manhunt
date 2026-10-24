@@ -1,23 +1,31 @@
 // =====================================================================
-// SFU Manhunt – chest device for Arduino UNO R4 WiFi + Grove Base Shield
+// SFU Manhunt – wrist device for Arduino UNO R4 WiFi + Grove Base Shield
 // Parts: Grove 16x2 I2C LCD, Grove Button, Grove Buzzer
 //
-// What it does
-//   Line 1 (always): time until the next ping + hiders alive    e.g.  PING 2:53    @4/5
-//   Line 2 (rotates every 3 s):
-//     zone timer        Zone shrink 9:42 / CLOSING!   0:40 / Hiding     2:10 / Final zone
-//     your powerup      >SHIELD      1/3   (TAP the button = next, HOLD = use it)
-//     active effects    HIDDEN PASS 1:25
-//   Buzzer: 3 long beeps = a ping revealed you, 2 = the seeker saw your decoy,
-//           1 short = your shield blocked it, tiny chirp 10 s before each ping,
-//           long beep = you're out.
+// What the screen shows
+//   Line 1: game stage + people left            e.g.  STAGE 2/7   @4/5
+//           (RING CLOSING / HIDING / FINAL STAGE / LOBBY / YOU'RE OUT / GAME OVER)
+//   Line 2: the ring – when it starts closing and how long it takes
+//             Ring closes 4:10   (waiting)   ->   Done in 0:40   (while closing)
+//           and every few seconds also: next ping time and your selected powerup
+//   "People left" = hiders still in the game (green). When one turns red (tagged,
+//   or out of the zone) the count drops and the device shows HIDER OUT.
+//
+// Buzzer
+//   4 short beeps   = the ring is starting to close
+//   2 beeps         = a hider is out
+//   3 long beeps    = a ping revealed your location (2 = they saw your decoy,
+//                     1 short = your shield blocked it)
+//   long beep       = you're out
+//
+// Button: TAP = show/choose your next powerup, HOLD (0.7 s) = use it
 //
 // How it talks to the game
 //   The R4 joins the wearer's iPhone hotspot and uses Firebase over HTTPS:
 //     devices/<DEVICE_ID>/state  <- written by the wearer's game app (read here every 3 s)
 //     devices/<DEVICE_ID>/cmd    -> written here when you use a powerup
 //     devices/<DEVICE_ID>/clock  -> used to sync this clock with Firebase
-//   In the app lobby, type the same DEVICE_ID into "Chest device ID".
+//   In the app lobby, type the same DEVICE_ID into "Wrist device ID".
 //
 // Arduino IDE setup
 //   Boards Manager: "Arduino UNO R4 Boards". Board: "Arduino UNO R4 WiFi".
@@ -37,7 +45,7 @@
 // ----------------------------- CONFIG: change for each device ---------
 const char *WIFI_SSID = "YOUR-HOTSPOT-NAME";      // wearer's iPhone hotspot (Settings > General > About > Name)
 const char *WIFI_PASS = "YOUR-HOTSPOT-PASSWORD";
-const char *DEVICE_ID = "chest-01";               // unique per device; same ID in the app lobby
+const char *DEVICE_ID = "wrist-01";               // unique per device; same ID in the app lobby
 
 // Same Firebase project as js/config.js
 const char *API_KEY   = "AIzaSyDZS8EsOIZogspxxCchz0nklfidSg5x4jo";
@@ -55,8 +63,7 @@ const char *AUTH_HOST = "identitytoolkit.googleapis.com";
 
 #define POLL_MS            3000    // how often to fetch the game state
 #define LONG_PRESS_MS      700     // hold this long to USE the selected powerup
-#define ROTATE_MS          3000    // line 2 switches every 3 s
-#define WARN_BEFORE_PING_S 10      // tiny chirp before each ping (0 = off)
+#define ROTATE_MS          4000    // line 2 switches every 4 s (ring info shown most)
 #define STALE_MS           60000   // no update from the phone for this long = "phone offline"
 #define TOKEN_MAX_AGE_MS   (50UL * 60 * 1000)
 
@@ -97,7 +104,7 @@ struct Item { String id, type; };
 struct Feed {
   bool valid = false;              // a state exists for this device
   String game, role, status, zonePhase, winner, meeting;
-  int alive = 0, total = 0;
+  int alive = 0, total = 0, stage = 0, stages = 0;
   double ts = 0, hidingUntil = 0, nextPingAt = 0, zoneAt = 0, endsAt = 0, passUntil = 0;
   bool shieldNext = false, decoyNext = false;
   int pingK = -1; String pingResult;
@@ -183,6 +190,8 @@ void fetchState() {
     f.meeting = (const char *)(doc["meeting"] | "");
     f.alive = doc["alive"] | 0;
     f.total = doc["total"] | 0;
+    f.stage = doc["stage"] | 0;
+    f.stages = doc["stages"] | 0;
     f.ts = doc["ts"] | 0.0;
     f.hidingUntil = doc["hidingUntil"] | 0.0;
     f.nextPingAt = doc["nextPingAt"] | 0.0;
@@ -329,11 +338,29 @@ void handleButton() {
 
 void handleGameEvents() {
   static bool initialised = false;
-  static int lastPingK = -1;
+  static int lastPingK = -1, lastAlive = -1;
   static String lastStatus;
-  static double lastWarnFor = 0;
+  static double ringBuzzedFor = 0;
   if (!feed.valid) return;
-  if (!initialised) { initialised = true; lastPingK = feed.pingK; lastStatus = feed.status; }
+  if (!initialised) { initialised = true; lastPingK = feed.pingK; lastStatus = feed.status; lastAlive = feed.alive; }
+
+  // The ring starts closing: buzz right on time (uses our synced clock, not the 3 s poll)
+  bool running = feed.game == "running";
+  if (running && feed.zonePhase == "hold" && feed.zoneAt && serverNow() >= feed.zoneAt && ringBuzzedFor != feed.zoneAt) {
+    ringBuzzedFor = feed.zoneAt;
+    backlight(255, 120, 0);
+    showMsg("RING CLOSING!", "Move inside", 3000);
+    beeps(4, 120, 80);
+  }
+
+  // A hider was caught (green -> red): people left goes down
+  if (running && lastAlive >= 0 && feed.alive < lastAlive && feed.status == "alive") {
+    backlight(255, 0, 0);
+    showMsg("HIDER OUT", String(feed.alive) + " left", 2500);
+    beeps(2, 150, 100);
+  }
+  lastAlive = feed.alive;
+
   if (feed.pingK != lastPingK) {
     lastPingK = feed.pingK;
     if (feed.pingResult == "seen")         { backlight(255, 0, 0); showMsg("PINGED!", "Seeker saw you", 3000); beeps(3, 250, 120); }
@@ -343,12 +370,6 @@ void handleGameEvents() {
   if (feed.status != lastStatus) {
     if (feed.status == "out") { showMsg("YOU'RE OUT", "", 4000); beeps(1, 1200, 0); }
     lastStatus = feed.status;
-  }
-  double toPing = (feed.nextPingAt - serverNow()) / 1000;
-  if (WARN_BEFORE_PING_S && feed.game == "running" && feed.status == "alive" && toPing > 0 &&
-      toPing <= WARN_BEFORE_PING_S && feed.nextPingAt != lastWarnFor) {
-    lastWarnFor = feed.nextPingAt;
-    beeps(1, 40, 0);
   }
 }
 
@@ -362,6 +383,8 @@ void draw() {
   if (!f.valid)            { backlight(255, 255, 255); line(0, "NOT PAIRED"); line(1, String("ID: ") + DEVICE_ID); return; }
   if (f.ts && now - f.ts > STALE_MS) { backlight(255, 120, 0); line(0, "Phone app"); line(1, "offline?"); return; }
 
+  String left = String(ICON_PERSON) + String(f.alive) + "/" + String(f.total);   // people left
+
   if (f.game == "lobby") {
     backlight(0, 120, 255);
     line(0, spread("LOBBY", String(ICON_PERSON) + String(f.total)));
@@ -370,44 +393,51 @@ void draw() {
   }
   if (f.game == "ended") {
     backlight(255, 255, 255);
-    line(0, f.winner == "seeker" ? "SEEKER WINS" : f.winner == "hiders" ? "HIDERS WIN!" : "GAME STOPPED");
+    line(0, spread(f.winner == "seeker" ? "SEEKER WINS" : f.winner == "hiders" ? "HIDERS WIN!" : "GAME OVER", left));
     line(1, f.meeting.length() ? String("Meet: ") + f.meeting : String(""));
     return;
   }
-  String alive = String(ICON_PERSON) + String(f.alive) + "/" + String(f.total);
   if (f.status == "out") {
     backlight(80, 80, 80);
-    line(0, spread("YOU'RE OUT", alive));
+    line(0, spread("YOU'RE OUT", left));
     line(1, "Ends in " + fmt((f.endsAt - now) / 1000));
     return;
   }
 
-  // ---- running, alive ----
-  line(0, spread("PING " + fmt((f.nextPingAt - now) / 1000), alive));
+  // ---- running ----
+  bool hiding = f.hidingUntil > now;
+  bool closing = !hiding && f.zonePhase == "closing";
+  bool finalRing = !hiding && f.zonePhase == "final";
 
-  String zone;
-  if (f.hidingUntil > now) zone = spread("Hiding", fmt((f.hidingUntil - now) / 1000));
-  else if (f.zonePhase == "closing") zone = spread("CLOSING!", fmt((f.zoneAt - now) / 1000));
-  else if (f.zonePhase == "hold") zone = spread("Zone shrink", fmt((f.zoneAt - now) / 1000));
-  else zone = "Final zone";
+  // Line 1: stage + people left
+  String stage = hiding ? String("HIDING")
+               : closing ? String("RING CLOSING")
+               : finalRing ? String("FINAL STAGE")
+               : "STAGE " + String(f.stage) + "/" + String(f.stages);
+  line(0, spread(stage, left));
 
+  // Line 2: ring timing first; also ping + powerup in rotation
+  String ring = hiding ? spread("Hunt starts", fmt((f.hidingUntil - now) / 1000))
+              : closing ? spread("Done in", fmt((f.zoneAt - now) / 1000))
+              : finalRing ? String("Final ring")
+              : spread("Ring closes", fmt((f.zoneAt - now) / 1000));
+  String ping = spread("Next ping", fmt((f.nextPingAt - now) / 1000));
   int sel = selectedIndex();
   String power = sel < 0 ? String("No powerups")
                : spread(String(">") + powerupName(f.inv[sel].type), String(sel + 1) + "/" + String(f.invCount));
 
-  String eff;
-  if (f.shieldNext) eff += "HIDDEN ";
-  if (f.decoyNext) eff += "DECOY ";
-  if (f.passUntil > now) eff += "PASS " + fmt((f.passUntil - now) / 1000);
+  String show;
+  if (millis() < powerupPinnedUntil) show = power;
+  else if (closing || hiding) show = ring;                         // the important one stays put
+  else {
+    String options[4] = { ring, ping, ring, f.role == "seeker" ? ring : power };  // ring shown half the time
+    show = options[(millis() / ROTATE_MS) % 4];
+  }
+  line(1, show);
 
-  if (f.role == "seeker") { line(1, zone); backlight(255, 0, 0); return; }
-
-  // line 2 rotates: zone -> powerup -> effects (if any); a tap pins the powerup
-  String options[3] = { zone, power, eff };
-  int count = eff.length() ? 3 : 2;
-  int idx = millis() < powerupPinnedUntil ? 1 : (millis() / ROTATE_MS) % count;
-  line(1, options[idx]);
-  if (f.zonePhase == "closing") backlight(255, 120, 0); else backlight(0, 255, 60);
+  if (closing) backlight(255, 120, 0);
+  else if (hiding) backlight(0, 120, 255);
+  else backlight(0, 255, 60);
 }
 
 void setup() {

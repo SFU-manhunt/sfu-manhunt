@@ -87,24 +87,26 @@
   };
 
   // Zone schedule: hold firstHoldSec, then (close closeSec, hold holdSec) repeated.
+  // Also returns step (shrinks finished so far) and steps (total shrinks in a game).
   SFU.scheduleAt = (c, t) => {
     const f = Math.min(0.99, Math.max(0.05, c.shrinkPercent / 100));
     const minS = c.minScale;
-    const final = s => ({ phase: 'final', scale: s, nextScale: null, nextChangeIn: null });
-    let time = t - c.firstHoldSec, s = 1;
-    if (time < 0) return { phase: 'hold', scale: 1, nextScale: Math.max(minS, f), nextChangeIn: -time };
+    const steps = Math.max(1, Math.ceil(Math.log(minS) / Math.log(f) - 1e-9));
+    let time = t - c.firstHoldSec, s = 1, step = 0;
+    const final = () => ({ phase: 'final', scale: s, nextScale: null, nextChangeIn: null, step, steps });
+    if (time < 0) return { phase: 'hold', scale: 1, nextScale: Math.max(minS, f), nextChangeIn: -time, step, steps };
     for (let guard = 0; guard < 500; guard++) {
-      if (s <= minS + 1e-9) return final(s);
+      if (s <= minS + 1e-9) return final();
       const target = Math.max(minS, s * f);
       if (time < c.closeSec) {
-        return { phase: 'closing', scale: s + (target - s) * (time / c.closeSec), nextScale: target, nextChangeIn: c.closeSec - time };
+        return { phase: 'closing', scale: s + (target - s) * (time / c.closeSec), nextScale: target, nextChangeIn: c.closeSec - time, step, steps };
       }
-      time -= c.closeSec; s = target;
-      if (s <= minS + 1e-9) return final(s);
-      if (time < c.holdSec) return { phase: 'hold', scale: s, nextScale: Math.max(minS, s * f), nextChangeIn: c.holdSec - time };
+      time -= c.closeSec; s = target; step++;
+      if (s <= minS + 1e-9) return final();
+      if (time < c.holdSec) return { phase: 'hold', scale: s, nextScale: Math.max(minS, s * f), nextChangeIn: c.holdSec - time, step, steps };
       time -= c.holdSec;
     }
-    return final(s);
+    return final();
   };
 
   // Random point inside the zone at this scale (not in off-limits), optionally filtered.

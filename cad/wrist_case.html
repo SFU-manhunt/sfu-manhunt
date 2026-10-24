@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wrist Case Designer</title>
+<style>
+  :root { --red: #A6192E; --bg: #f6f4f4; --panel: #ffffff; --text: #1c1c1c; --muted: #6b6b6b; --line: #e2dcdc; --ok: #1f8a4c; --bad: #c0392b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  #app { display: flex; height: 100%; }
+  #panel { width: 340px; flex: none; overflow: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 14px 16px 40px; }
+  #view { flex: 1; position: relative; min-width: 0; }
+  #view canvas { display: block; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h1 span { background: var(--red); color: #fff; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .stat { background: var(--bg); border-radius: 8px; padding: 8px; }
+  .stat b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .stat small { color: var(--muted); font-size: 11px; }
+  #checks div { font-size: 13px; padding: 3px 0; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); font-weight: 600; }
+  button { font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  button.primary { background: var(--red); color: #fff; border-color: var(--red); font-weight: 600; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  label.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0; }
+  label.rng { display: block; font-size: 13px; margin: 6px 0; }
+  label.rng input { width: 100%; }
+  details { border-top: 1px solid var(--line); padding: 6px 0; }
+  summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 76px; gap: 4px 8px; align-items: center; margin-top: 6px; }
+  .grid label { font-size: 12px; }
+  .grid input { width: 76px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; }
+  #busy { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,.7); color: #fff; padding: 6px 10px; border-radius: 99px; font-size: 12px; }
+  #legend { position: absolute; left: 12px; bottom: 12px; background: rgba(255,255,255,.92); border-radius: 10px; padding: 8px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.12); }
+  #legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  @media (max-width: 760px) { #app { flex-direction: column-reverse; } #panel { width: 100%; height: 50%; } #view { height: 50%; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1><span>SFU</span>Wrist Case</h1>
+    <div class="muted">Arduino UNO R4 WiFi + Grove Base Shield, Grove 16×2 LCD, button and buzzer. Two printed parts: base and lid.</div>
+
+    <div class="stats" id="stats"></div>
+
+    <h2>Fit check</h2>
+    <div id="checks" class="muted">Building…</div>
+
+    <h2>Download for printing</h2>
+    <div class="row">
+      <button class="primary" id="dl-base">Base (.stl)</button>
+      <button class="primary" id="dl-lid">Lid (.stl)</button>
+    </div>
+    <div class="muted">Both are already oriented for printing: base open side up, lid top face down. PLA/PETG, 0.2 mm layers, 3 walls, 20% infill, no supports needed.</div>
+
+    <h2>View</h2>
+    <label class="chk"><input type="checkbox" id="v-base" checked> Base</label>
+    <label class="chk"><input type="checkbox" id="v-lid" checked> Lid</label>
+    <label class="chk"><input type="checkbox" id="v-parts" checked> Electronics (ghosts)</label>
+    <label class="chk"><input type="checkbox" id="v-xray"> See-through case</label>
+    <label class="rng">Lift lid: <span id="lift-v">0</span> mm<input type="range" id="v-lift" min="0" max="90" value="0"></label>
+    <div class="row">
+      <button id="cam-iso">3D</button><button id="cam-top">Top</button><button id="cam-side">Side</button><button id="cam-front">USB end</button>
+    </div>
+
+    <h2>Measurements (mm) – check against your parts</h2>
+    <div class="muted">Change a number and the case rebuilds. Measure your LCD board especially; Grove LCD versions differ.</div>
+    <div id="params"></div>
+  </div>
+  <div id="view">
+    <div id="busy">Loading CAD engine…</div>
+    <div id="legend">
+      <div><i style="background:#cfc8c8"></i>Base</div>
+      <div><i style="background:#A6192E"></i>Lid</div>
+      <div><i style="background:#00979D"></i>Arduino + shield/cables</div>
+      <div><i style="background:#3b6fd8"></i>LCD</div>
+      <div><i style="background:#e0b000"></i>Button</div>
+      <div><i style="background:#333"></i>Buzzer</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import Module from 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.1/manifold.js';
+
+// ---------------------------------------------------------------- parameters
+// [key, label, default]   grouped; all in mm (1/0 for yes/no)
+const GROUPS = {
+  'Arduino UNO R4 WiFi + Base Shield': [
+    ['ardX', 'Board length', 68.6], ['ardY', 'Board width', 53.4], ['pcbT', 'Board thickness', 1.6],
+    ['standoffH', 'Standoff height', 4], ['stackH', 'Shield + Grove cables above board', 26],
+    ['ardGap', 'Gap board ↔ USB wall', 0.8],
+    ['usbY', 'USB-C centre from board edge', 38], ['usbW', 'USB-C hole width', 16], ['usbH', 'USB-C hole height', 9],
+    ['dcHole', 'Barrel-jack hole (1/0)', 1], ['dcY', 'Barrel jack centre', 7.6], ['dcW', 'Barrel hole width', 11], ['dcH', 'Barrel hole height', 12]
+  ],
+  'Grove 16×2 LCD': [
+    ['lcdX', 'Board length', 80], ['lcdY', 'Board width', 36],
+    ['lcdGlassX', 'Glass module length', 71], ['lcdGlassY', 'Glass module width', 24], ['lcdGlass', 'Glass module thickness', 7],
+    ['lcdDepth', 'Total depth (glass → back)', 13], ['winX', 'Window length', 66], ['winY', 'Window width', 17],
+    ['winOffX', 'Window offset X', 0], ['winOffY', 'Window offset Y', 0], ['lcdEdge', 'Gap LCD ↔ top wall', 3.5]
+  ],
+  'Grove button + buzzer': [
+    ['btnX', 'Button centre X', 72], ['buzX', 'Buzzer centre X', 45], ['stripY', 'Button/buzzer centre Y', 12.5],
+    ['btnHole', 'Button hole Ø', 7.5], ['btnSwitchH', 'Switch height', 5], ['btnDepth', 'Button module depth', 9],
+    ['buzD', 'Buzzer Ø', 12], ['buzH', 'Buzzer height', 9], ['buzDepth', 'Buzzer module depth', 13], ['frameH', 'Holder wall height', 5]
+  ],
+  'Case': [
+    ['innerX', 'Inside length', 89], ['innerY', 'Inside width', 66], ['wall', 'Wall', 2.2], ['floor', 'Floor', 2], ['lidT', 'Lid', 2],
+    ['cornerR', 'Corner radius', 4], ['headroom', 'Spare height', 1], ['clr', 'Fit clearance', 0.4],
+    ['bossR', 'Screw post radius', 2.8], ['bossAt', 'Screw post inset', 1.5],
+    ['pilot', 'Screw pilot Ø (M3)', 2.6], ['clear', 'Screw clearance Ø', 3.4], ['head', 'Countersink Ø', 6.2],
+    ['strapW', 'Strap width', 40], ['strapGap', 'Strap slot thickness', 3.5], ['strapBar', 'Strap bar', 3], ['strapH', 'Strap loop height', 10]
+  ]
+};
+// Arduino Uno-format mounting holes (from the board corner on the USB edge)
+const ARD_HOLES = [[13.97, 2.54], [15.24, 50.8], [66.04, 7.62], [66.04, 35.56]];
+
+const P = {};
+for (const g of Object.values(GROUPS)) for (const [k, , v] of g) P[k] = v;
+try { Object.assign(P, JSON.parse(localStorage.getItem('wristCaseParams') || '{}')); } catch (e) {}
+
+// ---------------------------------------------------------------- CAD
+const wasm = await Module();
+wasm.setup();
+const { Manifold } = wasm;
+
+const cube = (x, y, z) => Manifold.cube([x, y, z]);
+const cyl = (h, d, d2 = d, seg = 48) => Manifold.cylinder(h, d / 2, d2 / 2, seg);
+const U = list => Manifold.union(list);
+function rbox(x, y, z, r) {
+  r = Math.min(r, x / 2 - 0.01, y / 2 - 0.01);
+  if (r <= 0.05) return cube(x, y, z);
+  const c = [];
+  for (const px of [r, x - r]) for (const py of [r, y - r]) c.push(cyl(z, 2 * r).translate([px, py, 0]));
+  return Manifold.hull(c);
+}
+
+function build(P) {
+  const W = P.wall, F = P.floor, LT = P.lidT, C = P.clr;
+  const IX = P.innerX, IY = P.innerY;
+  const IH = P.standoffH + P.pcbT + P.stackH + P.lcdDepth + P.headroom;   // inside height
+  const OX = IX + 2 * W, OY = IY + 2 * W, BH = F + IH;                  // BH = top of base walls
+  const ard = { x: W + P.ardGap, y: W + (IY - P.ardY) / 2, z: F + P.standoffH };
+  const lcd = { x: W + (IX - P.lcdX) / 2, y: W + IY - P.lcdEdge - P.lcdY };
+  const btn = { x: W + P.btnX, y: W + P.stripY };
+  const buz = { x: W + P.buzX, y: W + P.stripY };
+  const bosses = [[P.bossAt, P.bossAt], [IX - P.bossAt, P.bossAt], [P.bossAt, IY - P.bossAt], [IX - P.bossAt, IY - P.bossAt]]
+    .map(([x, y]) => [W + x, W + y]);
+
+  // ---------- base ----------
+  const adds = [], subs = [];
+  for (const [x, y] of bosses) {
+    adds.push(cyl(IH, 2 * P.bossR).translate([x, y, F - 0.01]));
+    subs.push(cyl(13, P.pilot).translate([x, y, BH - 12]));
+  }
+  for (const [hx, hy] of ARD_HOLES) {
+    const x = ard.x + hx, y = ard.y + hy;
+    adds.push(cyl(P.standoffH, 5.5).translate([x, y, F - 0.01]));
+    subs.push(cyl(P.standoffH + 1.5, P.pilot).translate([x, y, F - 1]));
+  }
+  const portZ = ard.z + P.pcbT - 1.5;
+  subs.push(cube(W + 2, P.usbW, P.usbH).translate([-1, ard.y + P.usbY - P.usbW / 2, portZ]));
+  if (P.dcHole) subs.push(cube(W + 2, P.dcW, P.dcH).translate([-1, ard.y + P.dcY - P.dcW / 2, portZ]));
+  // strap loops on both long sides (strap goes under the case, through the slots, around the wrist)
+  const L = P.strapW + 6, xL = (OX - L) / 2, depth = P.strapGap + P.strapBar, sh = P.strapH;
+  adds.push(cube(L, P.strapBar, sh).translate([xL, -depth, 0]));
+  adds.push(cube(3, depth + 0.6, sh).translate([xL, -depth, 0]), cube(3, depth + 0.6, sh).translate([xL + L - 3, -depth, 0]));
+  adds.push(cube(L, P.strapBar, sh).translate([xL, OY + P.strapGap, 0]));
+  adds.push(cube(3, depth + 0.6, sh).translate([xL, OY - 0.6, 0]), cube(3, depth + 0.6, sh).translate([xL + L - 3, OY - 0.6, 0]));
+
+  const shell = rbox(OX, OY, BH, P.cornerR).subtract(rbox(IX, IY, IH + 5, Math.max(0.5, P.cornerR - W)).translate([W, W, F]));
+  const base = U([shell, ...adds]).subtract(U(subs));
+
+  // ---------- lid ----------
+  const ladds = [], lsubs = [];
+  const lipH = 3, lipT = 1.5;
+  let lip = rbox(IX - 2 * C, IY - 2 * C, lipH, Math.max(0.3, P.cornerR - W - C)).translate([W + C, W + C, BH - lipH])
+    .subtract(rbox(IX - 2 * C - 2 * lipT, IY - 2 * C - 2 * lipT, lipH + 1, 0.3).translate([W + C + lipT, W + C + lipT, BH - lipH - 0.5]));
+  lip = lip.subtract(U(bosses.map(([x, y]) => cyl(lipH + 2, 2 * (P.bossR + C + 0.3)).translate([x, y, BH - lipH - 1]))));
+  ladds.push(lip);
+  for (const [x, y] of bosses) {
+    lsubs.push(cyl(LT + lipH + 2, P.clear).translate([x, y, BH - lipH - 1]));
+    lsubs.push(cyl(1.81, P.clear, P.head).translate([x, y, BH + LT - 1.8]));
+  }
+  // LCD window (chamfered) + guide ledges around the LCD board
+  const wcx = lcd.x + P.lcdX / 2 + P.winOffX, wcy = lcd.y + P.lcdY / 2 + P.winOffY;
+  lsubs.push(Manifold.hull([
+    cube(P.winX, P.winY, 0.01).translate([wcx - P.winX / 2, wcy - P.winY / 2, BH - 0.5]),
+    cube(P.winX + 2 * LT, P.winY + 2 * LT, 0.01).translate([wcx - P.winX / 2 - LT, wcy - P.winY / 2 - LT, BH + LT + 0.01])
+  ]));
+  const px0 = lcd.x - C / 2, py0 = lcd.y - C / 2, lx = P.lcdX + C, ly = P.lcdY + C, hL = P.lcdGlass + 2, t = 1.2;
+  ladds.push(cube(0.6 * lx, t, hL).translate([px0 + 0.2 * lx, py0 - t, BH - hL]));
+  ladds.push(cube(0.6 * lx, t, hL).translate([px0 + 0.2 * lx, py0 + ly, BH - hL]));
+  ladds.push(cube(t, 0.6 * ly, hL).translate([px0 - t, py0 + 0.2 * ly, BH - hL]));
+  ladds.push(cube(t, 0.6 * ly, hL).translate([px0 + lx, py0 + 0.2 * ly, BH - hL]));
+  // holders for the Grove button and buzzer (open on the LCD side for the cable)
+  const g = 20 + C, fh = P.frameH;
+  for (const m of [btn, buz]) {
+    const x0 = m.x - g / 2, y0 = m.y - g / 2;
+    ladds.push(cube(t, g, fh).translate([x0 - t, y0, BH - fh]), cube(t, g, fh).translate([x0 + g, y0, BH - fh]), cube(g + 2 * t, t, fh).translate([x0 - t, y0 - t, BH - fh]));
+  }
+  // button hole with chamfer, buzzer sound holes
+  lsubs.push(cyl(LT + 1, P.btnHole).translate([btn.x, btn.y, BH - 0.5]), cyl(1.01, P.btnHole, P.btnHole + 2).translate([btn.x, btn.y, BH + LT - 1]));
+  lsubs.push(cyl(LT + 1, 2).translate([buz.x, buz.y, BH - 0.5]));
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; lsubs.push(cyl(LT + 1, 2).translate([buz.x + 3.6 * Math.cos(a), buz.y + 3.6 * Math.sin(a), BH - 0.5])); }
+
+  const lid = U([rbox(OX, OY, LT, P.cornerR).translate([0, 0, BH]), ...ladds]).subtract(U(lsubs));
+  // print orientation: flipped, top face on the bed
+  const flipped = lid.rotate([180, 0, 0]);
+  const fb = flipped.boundingBox();
+  const lidPrint = flipped.translate([-fb.min[0], -fb.min[1], -fb.min[2]]);
+
+  // ---------- ghost parts (for the fit check and the preview) ----------
+  const ghosts = {
+    board: U([cube(P.ardX, P.ardY, P.pcbT).translate([ard.x, ard.y, ard.z]),
+              cube(9, 9, 3.3).translate([ard.x - 1, ard.y + P.usbY - 4.5, ard.z + P.pcbT])]),
+    stack: cube(P.ardX, P.ardY, P.stackH).translate([ard.x, ard.y, ard.z + P.pcbT]),
+    lcd: U([
+      cube(P.lcdGlassX, P.lcdGlassY, P.lcdGlass).translate([lcd.x + (P.lcdX - P.lcdGlassX) / 2, lcd.y + (P.lcdY - P.lcdGlassY) / 2, BH - P.lcdGlass]),
+      cube(P.lcdX, P.lcdY, P.pcbT).translate([lcd.x, lcd.y, BH - P.lcdGlass - P.pcbT]),
+      cube(P.lcdX * 0.5, P.lcdY * 0.5, P.lcdDepth - P.lcdGlass - P.pcbT).translate([lcd.x + P.lcdX * 0.25, lcd.y + P.lcdY * 0.25, BH - P.lcdDepth])
+    ]),
+    button: U([
+      cube(6, 6, P.btnSwitchH).translate([btn.x - 3, btn.y - 3, BH - P.btnSwitchH]),
+      cube(20, 20, P.pcbT).translate([btn.x - 10, btn.y - 10, BH - P.btnSwitchH - P.pcbT]),
+      cube(10, 6, P.btnDepth - P.btnSwitchH - P.pcbT).translate([btn.x - 5, btn.y + 2, BH - P.btnDepth])
+    ]),
+    buzzer: U([
+      cyl(P.buzH, P.buzD).translate([buz.x, buz.y, BH - P.buzH]),
+      cube(20, 20, P.pcbT).translate([buz.x - 10, buz.y - 10, BH - P.buzH - P.pcbT]),
+      cube(10, 6, P.buzDepth - P.buzH - P.pcbT).translate([buz.x - 5, buz.y + 2, BH - P.buzDepth])
+    ])
+  };
+
+  // ---------- fit checks: any overlap bigger than 0.5 mm³ is a clash ----------
+  const clash = (a, b) => a.intersect(b).volume() > 0.5;
+  const checks = [];
+  const name = { board: 'Arduino board', stack: 'Shield + cables', lcd: 'LCD', button: 'Button', buzzer: 'Buzzer' };
+  for (const [k, gm] of Object.entries(ghosts)) {
+    if (clash(gm, base)) checks.push([false, name[k] + ' hits the base']);
+    if (clash(gm, lid)) checks.push([false, name[k] + ' hits the lid']);
+  }
+  for (const k of ['lcd', 'button', 'buzzer']) if (clash(ghosts[k], ghosts.stack)) checks.push([false, name[k] + ' hits the shield/cables (make the case taller)']);
+  if (clash(ghosts.button, ghosts.buzzer) || clash(ghosts.button, ghosts.lcd) || clash(ghosts.buzzer, ghosts.lcd)) checks.push([false, 'Lid parts overlap each other']);
+  if (!checks.length) checks.push([true, 'All parts fit, nothing collides']);
+  checks.push([true, 'USB-C reachable through the end wall' + (P.dcHole ? ' (+ barrel jack hole)' : '')]);
+  checks.push([true, 'Strap: ' + P.strapW + ' mm wide velcro band through the side loops']);
+
+  const grams = (base.volume() + lid.volume()) / 1000 * 1.24;
+  return { base, lid, lidPrint, ghosts, checks,
+    info: { OX, OY, H: BH + LT, strapOut: OY + 2 * depth, grams } };
+}
+
+// ---------------------------------------------------------------- three.js view
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf6f4f4);
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(150, 250, 200); scene.add(sun);
+const grid = new THREE.GridHelper(300, 30, 0xcccccc, 0xe4e0e0); scene.add(grid);
+
+const world = new THREE.Group();           // CAD is Z-up; three.js is Y-up
+world.rotation.x = -Math.PI / 2;
+scene.add(world);
+
+function toGeometry(m) {
+  const mesh = m.getMesh();
+  const g = new THREE.BufferGeometry();
+  const pos = new Float32Array(mesh.triVerts.length * 3);
+  for (let i = 0; i < mesh.triVerts.length; i++) {
+    const v = mesh.triVerts[i] * mesh.numProp;
+    pos[i * 3] = mesh.vertProperties[v]; pos[i * 3 + 1] = mesh.vertProperties[v + 1]; pos[i * 3 + 2] = mesh.vertProperties[v + 2];
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+const mats = {
+  base: new THREE.MeshStandardMaterial({ color: 0xcfc8c8, roughness: .8 }),
+  lid: new THREE.MeshStandardMaterial({ color: 0xA6192E, roughness: .7 }),
+  board: new THREE.MeshStandardMaterial({ color: 0x00979D, roughness: .6 }),
+  stack: new THREE.MeshStandardMaterial({ color: 0x00979D, transparent: true, opacity: .22, depthWrite: false }),
+  lcd: new THREE.MeshStandardMaterial({ color: 0x3b6fd8, roughness: .4 }),
+  button: new THREE.MeshStandardMaterial({ color: 0xe0b000 }),
+  buzzer: new THREE.MeshStandardMaterial({ color: 0x333333 })
+};
+const objs = {};
+let model = null;
+
+function show() {
+  for (const o of Object.values(objs)) { world.remove(o); o.geometry.dispose(); }
+  const add = (key, m) => { objs[key] = new THREE.Mesh(toGeometry(m), mats[key]); world.add(objs[key]); };
+  add('base', model.base); add('lid', model.lid);
+  for (const [k, m] of Object.entries(model.ghosts)) add(k, m);
+  applyView();
+}
+
+function applyView() {
+  if (!model) return;
+  const lift = +document.getElementById('v-lift').value;
+  document.getElementById('lift-v').textContent = lift;
+  const xray = document.getElementById('v-xray').checked;
+  for (const k of ['base', 'lid']) {
+    mats[k].transparent = xray; mats[k].opacity = xray ? .3 : 1; mats[k].depthWrite = !xray; mats[k].needsUpdate = true;
+  }
+  objs.base.visible = document.getElementById('v-base').checked;
+  objs.lid.visible = document.getElementById('v-lid').checked;
+  const parts = document.getElementById('v-parts').checked;
+  for (const k of ['board', 'stack', 'lcd', 'button', 'buzzer']) objs[k].visible = parts;
+  // lid-mounted parts lift with the lid
+  for (const k of ['lid', 'lcd', 'button', 'buzzer']) objs[k].position.z = lift;
+}
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+function setCam(kind) {
+  const i = model.info, c = new THREE.Vector3(i.OX / 2, i.H / 2, -i.OY / 2);
+  const d = 230;
+  const dirs = { iso: [0.9, 0.8, 1.1], top: [0.001, 1, 0.0001], side: [0, 0.25, 1], front: [-1, 0.3, 0] };
+  const v = new THREE.Vector3(...dirs[kind]).normalize().multiplyScalar(d);
+  camera.position.copy(c).add(v); controls.target.copy(c); controls.update();
+}
+
+function stats() {
+  const i = model.info;
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><b>${i.OX.toFixed(1)} mm</b><small>length (along arm)</small></div>` +
+    `<div class="stat"><b>${i.OY.toFixed(1)} mm</b><small>width (${i.strapOut.toFixed(0)} with strap loops)</small></div>` +
+    `<div class="stat"><b>${i.H.toFixed(1)} mm</b><small>height</small></div>` +
+    `<div class="stat"><b>~${Math.round(i.grams)} g</b><small>plastic (both parts)</small></div>`;
+  document.getElementById('checks').innerHTML = model.checks.map(([ok, t]) => `<div class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${t}</div>`).join('');
+}
+
+// ---------------------------------------------------------------- STL export
+function stl(m, filename) {
+  const mesh = m.getMesh(), tv = mesh.triVerts, vp = mesh.vertProperties, np = mesh.numProp;
+  const n = tv.length / 3, buf = new ArrayBuffer(84 + n * 50), dv = new DataView(buf);
+  const head = 'SFU Manhunt wrist case';
+  for (let i = 0; i < head.length; i++) dv.setUint8(i, head.charCodeAt(i));
+  dv.setUint32(80, n, true);
+  let o = 84;
+  for (let t = 0; t < n; t++) {
+    const p = [0, 1, 2].map(k => { const v = tv[t * 3 + k] * np; return [vp[v], vp[v + 1], vp[v + 2]]; });
+    const u = p[1].map((x, j) => x - p[0][j]), w = p[2].map((x, j) => x - p[0][j]);
+    let nx = u[1] * w[2] - u[2] * w[1], ny = u[2] * w[0] - u[0] * w[2], nz = u[0] * w[1] - u[1] * w[0];
+    const len = Math.hypot(nx, ny, nz) || 1;
+    for (const x of [nx / len, ny / len, nz / len]) { dv.setFloat32(o, x, true); o += 4; }
+    for (const q of p) for (const x of q) { dv.setFloat32(o, x, true); o += 4; }
+    dv.setUint16(o, 0, true); o += 2;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], { type: 'model/stl' }));
+  a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+document.getElementById('dl-base').onclick = () => model && stl(model.base, 'wrist_case_base.stl');
+document.getElementById('dl-lid').onclick = () => model && stl(model.lidPrint, 'wrist_case_lid.stl');
+window.wristCase = { get model() { return model; }, P, build, stl };   // for debugging
+
+// ---------------------------------------------------------------- UI
+const pbox = document.getElementById('params');
+for (const [gname, list] of Object.entries(GROUPS)) {
+  const d = document.createElement('details');
+  d.innerHTML = `<summary>${gname}</summary>`;
+  const grid = document.createElement('div'); grid.className = 'grid';
+  for (const [k, label] of list) {
+    const lab = document.createElement('label'); lab.textContent = label; lab.htmlFor = 'p-' + k;
+    const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.1'; inp.id = 'p-' + k; inp.value = P[k];
+    inp.onchange = () => { const v = parseFloat(inp.value); if (!isNaN(v)) { P[k] = v; save(); rebuild(); } };
+    grid.append(lab, inp);
+  }
+  d.appendChild(grid); pbox.appendChild(d);
+}
+const reset = document.createElement('button'); reset.textContent = 'Reset all measurements'; reset.style.marginTop = '10px';
+reset.onclick = () => { try { localStorage.removeItem('wristCaseParams'); } catch (e) {} location.reload(); };
+pbox.appendChild(reset);
+function save() { try { localStorage.setItem('wristCaseParams', JSON.stringify(P)); } catch (e) {} }
+
+for (const id of ['v-base', 'v-lid', 'v-parts', 'v-xray', 'v-lift']) document.getElementById(id).oninput = applyView;
+for (const k of ['iso', 'top', 'side', 'front']) document.getElementById('cam-' + k).onclick = () => setCam(k);
+
+let first = true;
+function rebuild() {
+  const busy = document.getElementById('busy');
+  busy.hidden = false; busy.textContent = 'Building…';
+  setTimeout(() => {
+    try {
+      model = build(P);
+      show(); stats();
+      if (first) { first = false; setCam('iso'); }
+      busy.hidden = true;
+    } catch (e) { busy.textContent = 'Error: ' + e.message; console.error(e); }
+  }, 20);
+}
+
+resize();
+rebuild();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

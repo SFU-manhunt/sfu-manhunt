@@ -14,8 +14,10 @@
     ['headStartSec', 'Hiding head start (s)', 10],
     ['pingIntervalSec', 'Ping every (s)', 30],
     ['pingShowSec', 'Ping dots stay (s)', 10],
-    ['droughtStartSec', 'No catch: pings speed up after (s)', 30],
-    ['droughtStepSec', 'No catch: faster again every (s)', 30],
+    ['drought1Sec', 'No catch for (s): pings faster', 30],
+    ['drought1Gap', '...then ping every (s)', 5],
+    ['drought2Sec', 'No catch for (s): pings fastest', 30],
+    ['drought2Gap', '...then ping every (s)', 5],
     ['firstHoldSec', 'First shrink after (s)', 30],
     ['closeSec', 'Each shrink takes (s)', 10],
     ['holdSec', 'Pause between shrinks (s)', 30],
@@ -220,11 +222,27 @@
     $('device-row').hidden = S.test;
     let dev = '';
     try { dev = localStorage.getItem('sfu_device') || ''; } catch (e) {}
-    $('in-device').value = dev;
+    $('in-device').value = $('in-demo-device').value = dev;
     linkDevice(dev);
   }
 
-  // ------------------------------------------------------------------ chest device
+  // The wrist device always talks through Firebase. In real games that's S.db;
+  // in the judge demo the game itself is local, so a separate Firebase handle is used.
+  const isDemo = () => S.test && SFU.Test && SFU.Test.demo;
+  const devDb = () => isDemo() ? S.devDb : (S.test ? null : S.db);
+  async function ensureDevDb() {
+    if (S.devDb) return S.devDb;
+    if (!fbConfigured()) return null;
+    try {
+      const d = SFU.makeFirebaseDb(SFU.FIREBASE_CONFIG);
+      await d.init();
+      await new Promise(r => setTimeout(r, 600));   // let the server clock offset arrive
+      S.devDb = d;
+    } catch (e) { console.warn('Firebase not available for the demo device', e); }
+    return S.devDb;
+  }
+
+  // ------------------------------------------------------------------ wrist device
   // Phone -> device: this app writes a small summary to devices/<id>/state
   //   whenever it changes (the Arduino polls it and shows it on its screen).
   // Device -> phone: the Arduino writes devices/<id>/cmd = { ts, use: <powerup id> }.
@@ -234,17 +252,18 @@
     S.devId = (id || '').trim();
     S.devLast = undefined; S.devFeedKey = '';
     try { localStorage.setItem('sfu_device', S.devId); } catch (e) {}
-    const status = $('device-status');
+    const status = isDemo() ? $('demo-device-status') : $('device-status');
     status.textContent = '';
-    if (!S.devId || !S.db || S.test) return;
+    const ddb = devDb();
+    if (!S.devId || !ddb) return;
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(S.devId)) { status.textContent = 'Use only letters, numbers, - and _'; return; }
     status.textContent = 'Linked to "' + S.devId + '". Hold the device button to test it.';
-    S.devUnsub = S.db.on('devices/' + S.devId + '/cmd', v => {
+    S.devUnsub = ddb.on('devices/' + S.devId + '/cmd', v => {
       const ts = v && v.ts;
       if (S.devLast === undefined) { S.devLast = ts; return; }
       if (ts === S.devLast) return;
       S.devLast = ts;
-      if (S.phase !== 'running') { toast('Chest device works! (' + S.devId + ')'); SFU.Audio.beep(150, 900); return; }
+      if (S.phase !== 'running') { toast('Wrist device works! (' + S.devId + ')'); SFU.Audio.beep(150, 900); return; }
       const type = v.use && (me().inv || {})[v.use];
       if (type && myRole() === 'hider' && isAlive(me())) usePowerup(v.use, type, true);
       else deviceButtonPressed();
@@ -265,6 +284,8 @@
       f.hidingUntil = t < c.headStartSec ? g.startedAt + c.headStartSec * 1000 : 0;
       f.nextPingAt = g.startedAt + pingSchedule(t, c).nextAt * 1000;
       f.zonePhase = sch.phase;
+      f.stage = sch.step + 1;            // stage 1 = before the first shrink
+      f.stages = sch.steps + 1;
       f.zoneAt = sch.nextChangeIn == null ? 0 : Math.round((g.startedAt + (t + sch.nextChangeIn) * 1000) / 1000) * 1000;
       f.endsAt = g.startedAt + c.gameDurationMin * 60000;
       f.shieldNext = p.shieldK != null && p.shieldK >= nk;
@@ -276,12 +297,14 @@
   }
 
   function publishDevice(force) {
-    if (!S.devId || S.test || !S.db || !S.game || !/^[A-Za-z0-9_-]{1,32}$/.test(S.devId)) return;
+    const ddb = devDb();
+    if (!S.devId || !ddb || !S.game || !/^[A-Za-z0-9_-]{1,32}$/.test(S.devId)) return;
     const f = deviceFeed();
     const key = JSON.stringify(f);
     if (!force && key === S.devFeedKey && Date.now() - S.devFeedAt < 30000) return;
     S.devFeedKey = key; S.devFeedAt = Date.now();
-    S.db.set('devices/' + S.devId + '/state', Object.assign(f, { ts: Math.round(S.db.now()) }))
+    if (isDemo() && SFU.Test.noteDevice) SFU.Test.noteDevice();
+    ddb.set('devices/' + S.devId + '/state', Object.assign(f, { ts: Math.round(S.db.now()) }))
       .catch(e => console.warn('device feed failed', e));
   }
 
@@ -293,6 +316,7 @@
     releaseWake();
     S.pickMode = null; $('pick-bar').hidden = true;
     S.ping = null; S.pingDrawn = null; S.puKey = '';
+    $('demo-caption').hidden = true;
     if (S.geoId != null) { navigator.geolocation.clearWatch(S.geoId); S.geoId = null; }
     if (SFU.Test) SFU.Test.end();
     if (S.test) { S.db = null; S.uid = null; S.test = false; }
@@ -620,7 +644,10 @@
     $('spec-list').hidden = role !== 'spectator';
     $('host-panel').hidden = !amHost();
     $('test-panel').hidden = !S.test;
-    $('btn-chest').hidden = !(S.test && role === 'hider');
+    $('btn-wrist').hidden = !(S.test && role === 'hider');
+    $('speed-row').hidden = isDemo();
+    $('demo-tools').hidden = !isDemo();
+    $('demo-auto').parentElement.hidden = role !== 'hider';
 
     if (role === 'hider') {
       const m = $('hider-msg');
@@ -738,8 +765,8 @@
 
   // ------------------------------------------------------------------ pings
   // Ping schedule. Ping k = 0 is the moment hiding ends. After that the gap is
-  // pingIntervalSec, but when the seeker hasn't caught anyone for droughtStartSec
-  // the gap shrinks through droughtIntervals (one step every droughtStepSec).
+  // pingIntervalSec, but when the seeker hasn't caught anyone for drought1Sec the
+  // gap drops to drought1Gap, and after drought2Sec to drought2Gap (until a catch).
   // A catch (confirmed tag) resets it. Every client computes the same schedule
   // from the game start time and the catch times (players' outAt).
   function catchTimes() {
@@ -752,17 +779,16 @@
     let lastCatch = c.headStartSec;
     for (const x of catches) if (x <= t && x > lastCatch) lastCatch = x;
     const dry = t - lastCatch;
-    const steps = arr(c.droughtIntervals);
-    if (dry < c.droughtStartSec || !steps.length) return c.pingIntervalSec;
-    const i = Math.min(steps.length - 1, Math.floor((dry - c.droughtStartSec) / c.droughtStepSec));
-    return Math.min(c.pingIntervalSec, steps[i]);
+    if (dry >= c.drought2Sec) return Math.max(1, Math.min(c.pingIntervalSec, c.drought2Gap));
+    if (dry >= c.drought1Sec) return Math.max(1, Math.min(c.pingIntervalSec, c.drought1Gap));
+    return c.pingIntervalSec;
   }
 
   // -> { k (index of the last ping, -1 before the first), lastAt, nextAt, gap } in game seconds
   function pingSchedule(t, c) {
     const catches = catchTimes();
     const key = [Math.floor(t), G().startedAt, catches.join(','), c.headStartSec, c.pingIntervalSec,
-      c.droughtStartSec, c.droughtStepSec, arr(c.droughtIntervals).join(',')].join('|');
+      c.drought1Sec, c.drought1Gap, c.drought2Sec, c.drought2Gap].join('|');
     if (S.pingMemo && S.pingMemo.key === key) return S.pingMemo.val;
     let val;
     if (t < c.headStartSec) val = { k: -1, lastAt: null, nextAt: c.headStartSec, gap: c.pingIntervalSec };
@@ -821,17 +847,29 @@
       (age < c.pingShowSec ? ' (dots fade in ' + SFU.fmt(c.pingShowSec - age) + ')' : '');
   }
 
+  // Ping dots stay pingShowSec, fading out smoothly over the last pingFadeSec.
   function drawPing(c) {
-    const visible = S.ping && (S.db.now() - S.ping.atGame) / 1000 < c.pingShowSec;
+    const age = S.ping ? (S.db.now() - S.ping.atGame) / 1000 : Infinity;
+    const visible = age < c.pingShowSec;
     const key = visible ? S.ping.k : null;
-    if (key === S.pingDrawn) return;
-    S.pingDrawn = key;
     const l = S.layers.ping;
-    l.clearLayers();
-    if (!visible) return;
-    for (const d of S.ping.dots) {
-      L.marker([d.lat, d.lng], { interactive: false, icon: L.divIcon({ className: '', html: '<div class="ping-dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }) })
-        .bindTooltip(d.name, { permanent: true, direction: 'right', className: 'lm-label' }).addTo(l);
+    if (key !== S.pingDrawn) {
+      S.pingDrawn = key;
+      S.pingFading = false;
+      l.clearLayers();
+      if (!visible) return;
+      for (const d of S.ping.dots) {
+        L.marker([d.lat, d.lng], { interactive: false, icon: L.divIcon({ className: '', html: '<div class="ping-dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }) })
+          .bindTooltip(d.name, { permanent: true, direction: 'right', className: 'lm-label' }).addTo(l);
+      }
+    }
+    if (visible && !S.pingFading && age >= c.pingShowSec - c.pingFadeSec) {
+      S.pingFading = true;
+      const ms = Math.max(200, (c.pingShowSec - age) * 1000 / (S.db.scale || 1));   // test mode runs faster
+      l.eachLayer(m => {
+        const els = [m.getElement(), m.getTooltip() && m.getTooltip().getElement()];
+        for (const e of els) if (e) { e.style.transition = 'opacity ' + ms + 'ms linear'; requestAnimationFrame(() => { e.style.opacity = 0; }); }
+      });
     }
   }
 
@@ -843,7 +881,7 @@
     S.hiderLastK = k;
     if (first && !fresh) return;   // joined/reloaded mid-interval: don't announce an old ping
     const p = me();
-    // Tell the chest device so it can buzz
+    // Tell the wrist device so it can buzz
     S.devPing = { k, result: p.shieldK === k ? 'blocked' : (p.decoy && p.decoy.k === k) ? 'decoy' : 'seen', at: Math.round(S.db.now()) };
     publishDevice(true);
     const msg = p.shieldK === k ? '🛡️ Ping blocked – the seeker did not see you'
@@ -932,7 +970,7 @@
     if (!box.children.length) box.appendChild(el('span', 'No powerups yet.', 'muted small'));
   }
 
-  // auto = triggered by the chest button (no screen): decoys get placed automatically.
+  // auto = triggered by the wrist device button: decoys get placed automatically.
   function usePowerup(id, type, auto) {
     const c = cfg(), k = nextPingK(elapsedSec(), c), p = me();
     if (type === 'shield') {
@@ -963,12 +1001,12 @@
     toast('🎭 Decoy placed: the next ping shows you there');
   }
 
-  // Chest device hook: one press uses a shield if you have one, otherwise a decoy.
+  // Wrist device hook: uses a shield if you have one, otherwise your first powerup.
   // The hardware (not built yet) will trigger this; Test mode has a button for it.
   function deviceButtonPressed() {
     if (S.phase !== 'running' || myRole() !== 'hider' || !isAlive(me())) return;
     const inv = Object.entries(me().inv || {});
-    if (!inv.length) { toast('Chest button: no powerups to use'); return; }
+    if (!inv.length) { toast('Wrist button: no powerups to use'); return; }
     const pick = inv.find(([, type]) => type === 'shield') || inv[0];
     usePowerup(pick[0], pick[1], true);
   }
@@ -1023,6 +1061,18 @@
   // ------------------------------------------------------------------ end
   function renderEnd() {
     showScreen('end');
+    $('demo-caption').hidden = true;
+    $('demo-summary').hidden = !isDemo();
+    if (isDemo()) {
+      const ul = $('demo-features');
+      ul.innerHTML = '';
+      for (const [label, shown] of SFU.Test.features()) {
+        const li = el('li');
+        li.appendChild(el('span', label));
+        li.appendChild(el('span', shown ? '✓ shown' : 'not this round', shown ? 'yes' : 'no'));
+        ul.appendChild(li);
+      }
+    }
     const g = G(), c = cfg();
     const hs = hiderUids();
     const left = hs.filter(u => isAlive(players()[u]));
@@ -1068,6 +1118,8 @@
   function tickNowOnce() { if (!tickedOnce) { tickedOnce = true; setTimeout(() => { tick(); tickedOnce = false; }, 0); } }
 
   // ------------------------------------------------------------------ wiring
+  function startDemo(role) { SFU.Test.begin(api, role, { demo: true }); }
+
   function wire() {
     try {
       $('in-name').value = localStorage.getItem('sfu_name') || '';
@@ -1085,9 +1137,19 @@
     };
     $('btn-leave').onclick = () => leaveGame();
     $('btn-home').onclick = () => leaveGame();
+    $('btn-demo').onclick = () => {
+      SFU.Audio.unlock();
+      modal('Judge demo (3 min)', 'A scripted round on the SFU Burnaby map with captions. Recommended: play as a hider so judges see powerups, pings and the wrist device.', [
+        { label: 'Play as hider', cls: 'primary', fn: () => startDemo('hider') },
+        { label: 'Watch everyone', fn: () => startDemo('spectator') },
+        { label: 'Cancel' }
+      ]);
+    };
+    $('btn-demo-again').onclick = () => { const r = SFU.Test.role; leaveGame(); startDemo(r); };
+    $('in-demo-device').onchange = e => linkDevice(e.target.value);
     $('btn-tag').onclick = openTagModal;
     $('btn-pick-cancel').onclick = () => { S.pickMode = null; $('pick-bar').hidden = true; };
-    $('btn-chest').onclick = deviceButtonPressed;
+    $('btn-wrist').onclick = deviceButtonPressed;
     $('in-device').onchange = e => linkDevice(e.target.value);
     // iPhone only allows sound after a tap; unlock on any tap (also after a reload).
     document.addEventListener('pointerdown', () => SFU.Audio.unlock());
@@ -1127,7 +1189,10 @@
     nextPingK: () => nextPingK(elapsedSec(), cfg()),
     pingScheduleAt: t => pingSchedule(t, cfg()),
     computePingDots,
-    randomZoneSpot() { const z = buildZone(); return z && SFU.randomInZone(z, api.scaleNow()); },
+    randomZoneSpot(ok) { const z = buildZone(); return z && SFU.randomInZone(z, api.scaleNow(), ok); },
+    // for the judge demo: Firebase server time (so the wrist device's clock matches), or null
+    async deviceClock() { const d = await ensureDevDb(); return d ? d.now() : null; },
+    caption(text) { const c = $('demo-caption'); c.textContent = text; c.hidden = !text; if (text) { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; } },
     deviceButtonPressed,
     db: () => S.db
   };

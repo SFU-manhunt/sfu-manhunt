@@ -30,6 +30,11 @@
   </div>
 
   <div class="card">
+    <button id="btn-demo" class="primary wide">Judge demo (3 min)</button>
+    <p class="muted small">A scripted 3-minute round with captions that walk judges through every feature. Runs anywhere, no walking needed.</p>
+  </div>
+
+  <div class="card">
     <button id="btn-test" class="wide">Test mode (no Firebase, no GPS)</button>
     <p class="muted small">Simulated players on the Burnaby map. Drag the blue dot (or use WASD) to move. Walk onto 🛡️/🎭 to collect powerups.</p>
   </div>
@@ -46,7 +51,7 @@
   </div>
   <div id="lobby-gps" class="chip">GPS: waiting…</div>
   <div id="device-row">
-    <label>Chest device ID (optional, hiders) <input id="in-device" maxlength="32" placeholder="e.g. chest-01" autocomplete="off" autocapitalize="off"></label>
+    <label>Wrist device ID (optional, hiders) <input id="in-device" maxlength="32" placeholder="e.g. wrist-01" autocomplete="off" autocapitalize="off"></label>
     <div id="device-status" class="muted small"></div>
   </div>
 
@@ -111,15 +116,23 @@
     <button id="btn-pick-cancel" class="small">Cancel</button>
   </div>
 
+  <div id="demo-caption" class="demo-caption" hidden></div>
+
   <div id="test-panel" class="hud test" hidden>
-    <div class="row">
+    <div id="speed-row" class="row">
       <span class="small">Test speed:</span>
       <button class="small scale active" data-scale="1">1×</button>
       <button class="small scale" data-scale="5">5×</button>
       <button class="small scale" data-scale="20">20×</button>
       <button class="small scale" data-scale="60">60×</button>
     </div>
-    <button id="btn-chest" class="small wide" hidden>Press chest button</button>
+    <div id="demo-tools" hidden>
+      <div class="small"><b>JUDGE DEMO</b></div>
+      <label class="check small"><input type="checkbox" id="demo-auto" checked> Autopilot (walks you to powerups)</label>
+      <input id="in-demo-device" class="small-input" placeholder="Wrist device ID (optional)" maxlength="32" autocomplete="off" autocapitalize="off">
+      <div id="demo-device-status" class="small"></div>
+    </div>
+    <button id="btn-wrist" class="small wide" hidden>Hold wrist button</button>
   </div>
 
   <div id="hud-bottom" class="hud">
@@ -150,6 +163,11 @@
   <h1 id="end-title"></h1>
   <p id="end-body"></p>
   <ul id="end-list" class="list"></ul>
+  <div id="demo-summary" hidden>
+    <h3>What the judges just saw</h3>
+    <ul id="demo-features" class="list"></ul>
+    <button id="btn-demo-again" class="primary wide">Run the demo again</button>
+  </div>
   <button id="btn-home" class="wide">Back to start</button>
 </section>
 

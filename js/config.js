@@ -48,13 +48,12 @@ SFU.GAME_DEFAULTS = {
   // Pings: once per interval the seeker's map shows every alive hider.
   // The first ping happens the moment hiding time ends.
   pingIntervalSec: 180,
-  pingShowSec: 60,           // how long the dots stay on the seeker's map
-  // If the seeker catches nobody for droughtStartSec, pings speed up through
-  // droughtIntervals, one step every droughtStepSec. A catch resets to normal.
-  // Default: no catch for 10 min -> every 1:30, 13 min -> every 1:00, 16 min -> every 0:30.
-  droughtStartSec: 600,
-  droughtStepSec: 180,
-  droughtIntervals: [90, 60, 30],
+  pingShowSec: 30,           // how long the dots stay on the seeker's map...
+  pingFadeSec: 5,            // ...fading out over the last 5 s (25 -> 30 s)
+  // If the seeker catches nobody for a while, pings speed up. A catch resets to normal.
+  // Default: no catch for 12.5 min -> every 1:00; 15 min -> every 0:30 (stays there until a catch).
+  drought1Sec: 750, drought1Gap: 60,
+  drought2Sec: 900, drought2Gap: 30,
   staleSec: 60,              // positions older than this aren't shown (counted as "hidden")
   positionIntervalSec: 4,    // how often phones upload GPS
 
@@ -69,7 +68,7 @@ SFU.GAME_DEFAULTS = {
 };
 
 // Powerup types. Add new ones here, then handle them in usePowerup() in app.js
-// (and add the short name to POWERUP_NAMES in the chest device firmware).
+// (and add the short name to powerupName() in the wrist device firmware).
 SFU.POWERUPS = {
   shield: { icon: '🛡️', name: 'Shield',      desc: 'You are not shown on the next ping' },
   decoy:  { icon: '🎭', name: 'Decoy',       desc: 'The next ping shows you wherever you choose' },
