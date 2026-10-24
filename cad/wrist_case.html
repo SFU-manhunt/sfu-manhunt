@@ -395,11 +395,11 @@ function stats() {
   document.getElementById('style-note').textContent = P.style === 'frame'
     ? 'Base plate + 4 pillars + top plate. Open sides, fastest to print. Electronics are visible.'
     : 'Closed box with walls. Best protection, but takes about 3× longer to print.';
+  document.getElementById('checks').innerHTML = model.checks.map(([ok, t]) => `<div class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${t}</div>`).join('');
 }
 function dur(min) {
   min = Math.round(min / 5) * 5;
   return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '');
-  document.getElementById('checks').innerHTML = model.checks.map(([ok, t]) => `<div class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${t}</div>`).join('');
 }
 
 // ---------------------------------------------------------------- STL export
@@ -449,6 +449,7 @@ function save() { try { localStorage.setItem('wristCaseParams', JSON.stringify(P
 
 for (const id of ['v-base', 'v-lid', 'v-parts', 'v-xray', 'v-lift']) document.getElementById(id).oninput = applyView;
 for (const k of ['iso', 'top', 'side', 'front']) document.getElementById('cam-' + k).onclick = () => setCam(k);
+for (const b of document.querySelectorAll('#style-seg button')) b.onclick = () => { P.style = b.dataset.style; save(); rebuild(); };
 
 let first = true;
 function rebuild() {
