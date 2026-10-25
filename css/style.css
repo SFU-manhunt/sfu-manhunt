@@ -81,6 +81,11 @@ button.active { background: var(--red); color: #fff; border-color: var(--red); }
 .test button { background: #333; color: #fff; border-color: #555; }
 .test button.active { background: var(--red); }
 #btn-wrist { margin-top: 6px; }
+.test-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.test-head button { padding: 0 10px; font-size: 18px; line-height: 24px; }
+.test.min { width: auto; padding: 6px 8px 6px 12px; cursor: pointer; }
+.test.min #test-body { display: none; }
+@media (max-width: 600px) { .test { width: calc(100% - 16px); left: 8px; } .test.min { left: auto; width: auto; } }
 .small-input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #555; background: #222; color: #fff; font-size: 13px; margin-top: 6px; }
 .test label.check { margin: 6px 0; }
 

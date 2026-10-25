@@ -1152,6 +1152,21 @@
     $('btn-demo-judging').onclick = () => { SFU.Audio.unlock(); startDemo('hider'); };
     $('btn-demo-again').onclick = () => { const r = SFU.Test.role; leaveGame(); startDemo(r); };
     $('in-demo-device').onchange = e => linkDevice(e.target.value);
+
+    // Demo/test tools panel can be minimised to a small pill. Starts minimised on
+    // phones; the choice is remembered.
+    const panel = $('test-panel');
+    const setMin = min => {
+      panel.classList.toggle('min', min);
+      $('test-toggle').textContent = min ? '▸' : '–';
+      $('test-toggle').setAttribute('aria-label', min ? 'Open demo tools' : 'Minimise demo tools');
+      try { localStorage.setItem('sfu_tools_min', min ? '1' : '0'); } catch (e) {}
+    };
+    let savedMin = null;
+    try { savedMin = localStorage.getItem('sfu_tools_min'); } catch (e) {}
+    setMin(savedMin == null ? window.innerWidth < 600 : savedMin === '1');
+    $('test-toggle').onclick = e => { e.stopPropagation(); setMin(!panel.classList.contains('min')); };
+    panel.addEventListener('click', () => { if (panel.classList.contains('min')) setMin(false); });
     $('btn-tag').onclick = openTagModal;
     $('btn-pick-cancel').onclick = () => { S.pickMode = null; $('pick-bar').hidden = true; };
     $('btn-wrist').onclick = deviceButtonPressed;

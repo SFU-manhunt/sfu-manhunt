@@ -7,7 +7,7 @@
 <title>SFU Manhunt</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="css/style.css?v=12">
+<link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
 <div id="map"></div>
@@ -190,6 +190,11 @@
   <div id="demo-caption" class="demo-caption" hidden></div>
 
   <div id="test-panel" class="hud test" hidden>
+    <div class="test-head">
+      <span id="test-title" class="small"><b>Demo tools</b></span>
+      <button id="test-toggle" class="small" aria-label="Minimise demo tools">–</button>
+    </div>
+    <div id="test-body">
     <div id="speed-row" class="row">
       <span class="small">Test speed:</span>
       <button class="small scale active" data-scale="1">1×</button>
@@ -198,12 +203,12 @@
       <button class="small scale" data-scale="60">60×</button>
     </div>
     <div id="demo-tools" hidden>
-      <div class="small"><b>JUDGE DEMO</b></div>
       <label class="check small"><input type="checkbox" id="demo-auto" checked> Autopilot (walks you to powerups)</label>
       <input id="in-demo-device" class="small-input" placeholder="Wrist device ID (optional)" maxlength="32" autocomplete="off" autocapitalize="off">
       <div id="demo-device-status" class="small"></div>
     </div>
     <button id="btn-wrist" class="small wide" hidden>Hold wrist button</button>
+    </div>
   </div>
 
   <div id="hud-bottom" class="hud">
@@ -257,12 +262,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="js/config.js?v=12"></script>
-<script src="js/campus.js?v=12"></script>
-<script src="js/geo.js?v=12"></script>
-<script src="js/db.js?v=12"></script>
-<script src="js/sound.js?v=12"></script>
-<script src="js/app.js?v=12"></script>
-<script src="js/testmode.js?v=12"></script>
+<script src="js/config.js?v=13"></script>
+<script src="js/campus.js?v=13"></script>
+<script src="js/geo.js?v=13"></script>
+<script src="js/db.js?v=13"></script>
+<script src="js/sound.js?v=13"></script>
+<script src="js/app.js?v=13"></script>
+<script src="js/testmode.js?v=13"></script>
 </body>
 </html>

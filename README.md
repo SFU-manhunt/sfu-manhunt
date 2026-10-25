@@ -2,6 +2,8 @@
 
 A campus-wide manhunt game for phones (works on iPhone). Hiders hide, and one seeker hunts them. The play area **shrinks over time**. Every few minutes the seeker gets a **ping** showing where the hiders are. Hiders can collect **powerups** that the app places around campus to dodge or fool those pings.
 
+**Play:** https://sfu-manhunt.github.io/sfu-manhunt/ · **Case designer:** https://sfu-manhunt.github.io/sfu-manhunt/cad/wrist_case.html · **Code:** https://github.com/SFU-manhunt/sfu-manhunt
+
 This is a **base version**. Expect to tweak coordinates and timings once you've walked the campus.
 
 ## How the game works
@@ -90,8 +92,8 @@ Old games stay in the database. Delete the `games` node in the console now and t
 1. On github.com, click **New repository** and name it `sfu-manhunt`. Make it **Public** (free Pages needs that). Don't add a README.
 2. On the empty repository page, click **uploading an existing file**. Drag in everything in this folder (`index.html`, `manifest.json`, `README.md`, `database.rules.json`, `BUILD_PROMPT.md`, `.gitignore`, and the `css` and `js` folders), then click **Commit changes**.
 3. Go to **Settings → Pages → Source: Deploy from a branch → `main` / (root) → Save**.
-4. After 1–2 minutes it's live at `https://YOURNAME.github.io/sfu-manhunt/`.
-5. In Firebase, go to **Authentication → Settings → Authorized domains → Add domain** and add `YOURNAME.github.io`.
+4. After 1–2 minutes it's live at `https://sfu-manhunt.github.io/sfu-manhunt/`.
+5. In Firebase, go to **Authentication → Settings → Authorized domains → Add domain** and add `sfu-manhunt.github.io`.
 
 To update the site later, upload the changed files again the same way. Or install [GitHub Desktop](https://desktop.github.com) to sync the folder with one click.
 
