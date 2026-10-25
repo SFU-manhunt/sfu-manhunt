@@ -20,7 +20,7 @@
         "startedAt": { ".write": "auth != null && data.parent().child('hostUid').val() === auth.uid" },
         "endedAt":   { ".write": "auth != null && data.parent().child('hostUid').val() === auth.uid" },
         "winner":    { ".write": "auth != null && data.parent().child('hostUid').val() === auth.uid" },
-        "seekerUid": { ".write": "auth != null && data.parent().child('hostUid').val() === auth.uid" },
+        "seekers":   { ".write": "auth != null && data.parent().child('hostUid').val() === auth.uid" },
         "config":    { ".write": "auth != null && data.parent().child('hostUid').val() === auth.uid" },
 
         "players": {
@@ -38,7 +38,7 @@
 
         "tags": {
           "$hider": {
-            ".write": "auth != null && (auth.uid === $hider || auth.uid === root.child('games').child($code).child('seekerUid').val())"
+            ".write": "auth != null && (auth.uid === $hider || root.child('games').child($code).child('seekers').child(auth.uid).exists())"
           }
         },
 

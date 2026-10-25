@@ -124,10 +124,10 @@
 
   // "Placement AI": scores random candidate spots and returns the best one.
   // Good spots are safely inside the zone, survive the next shrink, are not
-  // right next to the seeker, are spread out from other powerups, sit about
+  // right next to any seeker, are spread out from other powerups, sit about
   // 120 m from the nearest hider (worth the trip but risky), and are often
   // near a landmark. Tweak the weights below to change the feel.
-  SFU.placePowerup = ({ zone, scale, nextScale, seeker, hiders, existing, landmarks }) => {
+  SFU.placePowerup = ({ zone, scale, nextScale, seekers, hiders, existing, landmarks }) => {
     const minDist = (p, list) => list.length ? Math.min(...list.map(q => SFU.haversine(p, q))) : null;
     let best = null;
     for (let i = 0; i < 60; i++) {
@@ -135,10 +135,10 @@
       if (!p) continue;
       let score = Math.random() * 0.8;                            // a little unpredictability
       if (nextScale != null && zone.check(p, nextScale, 0).inside) score += 2;
-      if (seeker) {
-        const d = SFU.haversine(p, seeker);
-        if (d < 60) continue;
-        score += Math.min(d, 300) / 100;
+      const ds = minDist(p, seekers || []);   // nearest seeker
+      if (ds != null) {
+        if (ds < 60) continue;
+        score += Math.min(ds, 300) / 100;
       }
       const dh = minDist(p, hiders);
       if (dh != null) score += 2 - Math.abs(dh - 120) / 80;

@@ -1,5 +1,5 @@
 // SFU Manhunt – UI and game logic.
-// Data lives at games/<CODE> = { hostUid, state: lobby|running|ended, seekerUid,
+// Data lives at games/<CODE> = { hostUid, state: lobby|running|ended, seekers: {uid: true},
 //   startedAt, winner, config: {...}, players: {uid: {...}}, tags: {hiderUid: {...}} }
 (function () {
   'use strict';
@@ -11,6 +11,7 @@
   // Number settings shown in the lobby: [key, label, step]
   const SETTINGS = [
     ['gameDurationMin', 'Game length (min)', 1],
+    ['maxSeekers', 'Max seekers', 1],
     ['headStartSec', 'Hiding head start (s)', 10],
     ['pingIntervalSec', 'Ping every (s)', 30],
     ['pingShowSec', 'Ping dots stay (s)', 10],
@@ -59,10 +60,11 @@
     const p = players()[uid];
     if (!p) return 'none';
     if (p.role === 'spectator') return 'spectator';
-    return uid === G().seekerUid ? 'seeker' : 'hider';
+    return (G().seekers || {})[uid] ? 'seeker' : 'hider';
   }
   const myRole = () => roleOf(S.uid);
   const hiderUids = () => Object.keys(players()).filter(u => roleOf(u) === 'hider');
+  const seekerUids = () => Object.keys(players()).filter(u => roleOf(u) === 'seeker');
 
   function toast(msg, ms = 3000) {
     const t = $('toast');
@@ -590,8 +592,12 @@
       li.appendChild(left);
       const role = roleOf(uid);
       if (host && role !== 'spectator') {
+        // tap to toggle; up to maxSeekers seekers
         const b = el('button', role === 'seeker' ? 'Seeker ✓' : 'Make seeker', 'small' + (role === 'seeker' ? ' active' : ''));
-        b.onclick = () => S.db.update(gamePath(), { seekerUid: uid });
+        b.onclick = () => {
+          if (role !== 'seeker' && seekerUids().length >= cfg().maxSeekers) { toast('Up to ' + cfg().maxSeekers + ' seekers. Tap a seeker to remove them first.'); return; }
+          S.db.update(gamePath('seekers'), { [uid]: role === 'seeker' ? null : true });
+        };
         li.appendChild(b);
       } else {
         li.appendChild(el('span', role, 'small muted'));
@@ -603,8 +609,9 @@
   }
 
   function startGame() {
-    const seeker = G().seekerUid;
-    if (!seeker || roleOf(seeker) !== 'seeker') { $('lobby-msg').textContent = 'Pick a seeker first.'; return; }
+    const n = seekerUids().length;
+    if (!n) { $('lobby-msg').textContent = 'Pick at least one seeker (up to ' + cfg().maxSeekers + ').'; return; }
+    if (n > cfg().maxSeekers) { $('lobby-msg').textContent = 'Too many seekers (max ' + cfg().maxSeekers + ').'; return; }
     if (!hiderUids().length) { $('lobby-msg').textContent = 'Need at least one hider.'; return; }
     if (!buildZone()) { $('lobby-msg').textContent = 'The play area is not set.'; return; }
     $('lobby-msg').textContent = '';
@@ -903,11 +910,11 @@
     }
     if (live.length >= c.maxPowerups || now - S.lastSpawnGame < c.powerupEverySec * 1000) return;
     S.lastSpawnGame = now;
-    const sk = players()[G().seekerUid];
+    const seekers = seekerUids().map(u => players()[u]).filter(p => p.lat != null);
     const hiders = hiderUids().map(u => players()[u]).filter(p => isAlive(p) && p.lat != null);
     const spot = SFU.placePowerup({
       zone: S.zone, scale: sch.scale, nextScale: sch.nextScale,
-      seeker: sk && sk.lat != null ? sk : null, hiders, existing: live,
+      seekers, hiders, existing: live,
       landmarks: (SFU.CAMPUSES[c.campus] || { landmarks: [] }).landmarks
     });
     if (!spot) return;
@@ -1078,7 +1085,7 @@
     const left = hs.filter(u => isAlive(players()[u]));
     const title = $('end-title'), body = $('end-body');
     title.style.color = '';
-    if (g.winner === 'seeker') { title.textContent = 'Seeker wins!'; body.textContent = 'All hiders were found.'; }
+    if (g.winner === 'seeker') { title.textContent = seekerUids().length > 1 ? 'Seekers win!' : 'Seeker wins!'; body.textContent = 'All hiders were found.'; }
     else if (g.winner === 'hiders') { title.textContent = 'Hiders win!'; body.textContent = left.length + ' hider(s) survived until time ran out.'; }
     else {
       title.textContent = 'GAME STOPPED'; title.style.color = 'var(--red)';

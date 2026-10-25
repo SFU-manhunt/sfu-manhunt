@@ -23,6 +23,7 @@ SFU.FIREBASE_CONFIG = {
 // ---------------------------------------------------------------------
 SFU.GAME_DEFAULTS = {
   gameDurationMin: 60,       // game length; hiders win when it runs out
+  maxSeekers: 3,             // the host can pick up to this many seekers
   headStartSec: 300,         // hiding time before the seeker is released
 
   // Zone: waits firstHoldSec, then closes over closeSec, pauses holdSec, closes again...

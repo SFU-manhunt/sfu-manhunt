@@ -7,7 +7,7 @@
 <title>SFU Manhunt</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="css/style.css?v=13">
+<link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
 <div id="map"></div>
@@ -53,25 +53,25 @@
 
   <section id="judging" class="judging">
     <h2>Judging</h2>
-    <p class="lead">SFU Manhunt is a campus-wide game of hide-and-seek on Burnaby Mountain. Hiders and a seeker play on their iPhones, the play area shrinks over time, and every hider wears a wrist device we built with an Arduino.</p>
+    <p class="lead">SFU Manhunt is a campus-wide game of hide-and-seek on Burnaby Mountain. Hiders and up to 3 seekers play on their iPhones, the play area shrinks over time, and every hider wears a wrist device we built with an Arduino.</p>
     <button id="btn-demo-judging" class="primary wide">Watch the 3-minute demo</button>
 
     <h3>How a round works</h3>
     <ol>
-      <li><b>Lobby:</b> the host creates a game, players join with a 5-letter code, and the host picks the seeker.</li>
+      <li><b>Lobby:</b> the host creates a game, players join with a 5-letter code, and the host picks up to 3 seekers.</li>
       <li><b>Hiding:</b> hiders get a head start to scatter across campus.</li>
-      <li><b>Hunt:</b> the seeker uses pings to find hiders and tags them in person.</li>
-      <li><b>End:</b> the seeker wins by catching everyone. The hiders win if anyone survives the clock.</li>
+      <li><b>Hunt:</b> the seekers use pings to find hiders and tag them in person.</li>
+      <li><b>End:</b> the seekers win by catching everyone. The hiders win if anyone survives the clock.</li>
     </ol>
 
     <h3>Game features</h3>
     <ul>
       <li><b>Live GPS map:</b> every phone shares its position in real time.</li>
-      <li><b>Pings:</b> every 3 minutes the seeker sees all hiders for 30 seconds (the dots fade out).</li>
+      <li><b>Pings:</b> every 3 minutes the seekers see all hiders for 30 seconds (the dots fade out).</li>
       <li><b>Faster pings:</b> if nobody is caught for 12.5 minutes, pings come every minute. After 15 minutes they come every 30 seconds until someone is caught.</li>
       <li><b>Shrinking zone:</b> an SFU-shaped border closes in stages toward a final point. Stay outside too long and you're eliminated (with GPS-error buffers so it's fair).</li>
       <li><b>Off-limits areas:</b> roads and forest edges drawn on the map for safety.</li>
-      <li><b>Tagging:</b> the seeker tags a hider within 30 m, and the hider confirms on their phone.</li>
+      <li><b>Tagging:</b> a seeker tags a hider within 30 m, and the hider confirms on their phone.</li>
       <li><b>Safety:</b> the host can stop the game for everyone and send them to a meeting point.</li>
     </ul>
 
@@ -80,7 +80,7 @@
       <li><b>🛡️ Shield:</b> you're hidden from the next ping.</li>
       <li><b>🎭 Decoy:</b> the next ping shows you wherever you choose.</li>
       <li><b>🧭 Border Pass:</b> leave the shrunken zone for 90 seconds (but not the original border).</li>
-      <li><b>The placement AI</b> scores dozens of candidate spots and picks the best one: inside the zone, away from the seeker, about 120 m from hiders so it's worth the risk, and spread out near campus landmarks.</li>
+      <li><b>The placement AI</b> scores dozens of candidate spots and picks the best one: inside the zone, away from the seekers, about 120 m from hiders so it's worth the risk, and spread out near campus landmarks.</li>
     </ul>
 
     <h3>The wrist device</h3>
@@ -262,12 +262,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="js/config.js?v=13"></script>
-<script src="js/campus.js?v=13"></script>
-<script src="js/geo.js?v=13"></script>
-<script src="js/db.js?v=13"></script>
-<script src="js/sound.js?v=13"></script>
-<script src="js/app.js?v=13"></script>
-<script src="js/testmode.js?v=13"></script>
+<script src="js/config.js?v=14"></script>
+<script src="js/campus.js?v=14"></script>
+<script src="js/geo.js?v=14"></script>
+<script src="js/db.js?v=14"></script>
+<script src="js/sound.js?v=14"></script>
+<script src="js/app.js?v=14"></script>
+<script src="js/testmode.js?v=14"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # SFU Manhunt
 
-A campus-wide manhunt game for phones (works on iPhone). Hiders hide, and one seeker hunts them. The play area **shrinks over time**. Every few minutes the seeker gets a **ping** showing where the hiders are. Hiders can collect **powerups** that the app places around campus to dodge or fool those pings.
+A campus-wide manhunt game for phones (works on iPhone). Hiders hide, and up to 3 seekers hunt them. The play area **shrinks over time**. Every few minutes the seekers get a **ping** showing where the hiders are. Hiders can collect **powerups** that the app places around campus to dodge or fool those pings.
 
 **Play:** https://sfu-manhunt.github.io/sfu-manhunt/ · **Case designer:** https://sfu-manhunt.github.io/sfu-manhunt/cad/wrist_case.html · **Code:** https://github.com/SFU-manhunt/sfu-manhunt
 
@@ -57,7 +57,7 @@ database.rules.json        Firebase security rules
 python -m http.server 8080
 ```
 
-Open http://localhost:8080 and click **Test mode**. Drag the blue dot (or use WASD), walk onto 🛡️/🎭 to collect them, and use the speed buttons. Play as a hider to see SeekerBot get fooled by your decoys and shields.
+Open http://localhost:8080 and click **Test mode**. Drag the blue dot (or use WASD), walk onto 🛡️/🎭 to collect them, and use the speed buttons. Play as a hider to see the three SeekerBots get fooled by your decoys and shields.
 
 ### Judge demo (3-minute rounds)
 
@@ -72,7 +72,7 @@ On the home screen, tap **Judge demo (3 min)**, then **Play as hider** (recommen
 | ~0:50 | **Drifter** leaves the zone and is eliminated |
 | ~1:00 | A **Border Pass** drops and gets used |
 | 1:30 / 2:00 | No catch, so **pings speed up** (every 10 s, then every 6 s) |
-| ~2:10 | SeekerBot **tags** a hider, and pings reset to normal |
+| ~2:10 | One of the 3 SeekerBots **tags** a hider, and pings reset to normal |
 | 3:00 | Time's up, **Hiders win**, and a summary lists every feature shown |
 
 - **Autopilot** (on by default) walks you around so the presenter can just talk. Untick it to drag the blue dot yourself.

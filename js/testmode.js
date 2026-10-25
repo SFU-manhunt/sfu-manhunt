@@ -18,7 +18,7 @@
   // ---- Judge demo: everything squeezed into 3 minutes ----
   //  0:00 hiding  ·  0:15 first ping, then every 20 s  ·  0:18 a Shield drops near you
   //  0:40 ring starts closing  ·  ~1:00 a Border Pass drops  ·  1:30 / 2:00 pings speed up
-  //  ~2:10 SeekerBot catches someone (pings reset)  ·  3:00 time's up
+  //  ~2:10 a SeekerBot catches someone (pings reset)  ·  3:00 time's up
   const DEMO_CONFIG = {
     gameDurationMin: 3, headStartSec: 15,
     pingIntervalSec: 20, pingShowSec: 8, pingFadeSec: 2,
@@ -66,7 +66,9 @@
 
     bots = ['Alice', 'Bob', 'Chen', 'Dana'].map((n, i) => ({ uid: 'bot' + i, name: n, kind: 'hider' }));
     bots.push({ uid: 'drift', name: 'Drifter', kind: 'drifter' });   // walks out of the zone on purpose
-    if (role !== 'seeker') bots.push({ uid: 'seekbot', name: 'SeekerBot', kind: 'seeker' });
+    // 3 seekers: three SeekerBots, or you + two SeekerBots when you play as the seeker
+    const botSeekers = role === 'seeker' ? 2 : 3;
+    for (let i = 1; i <= botSeekers; i++) bots.push({ uid: 'seekbot' + i, name: 'SeekerBot ' + i, kind: 'seeker' });
 
     const now = Math.round(db.now());
     const players = { me: { name: 'You', role: role === 'spectator' ? 'spectator' : 'hider', status: 'alive', joinedAt: now } };
@@ -76,7 +78,10 @@
       b.tracker = new SFU.BorderTracker(); b.seq = 0; b.target = null;
       players[b.uid] = { name: b.name, role: 'hider', status: 'alive', joinedAt: now, lat: b.pos.lat, lng: b.pos.lng, acc: 8, ts: Date.now() };
     }
-    const game = { hostUid: 'me', state: 'lobby', createdAt: now, seekerUid: role === 'seeker' ? 'me' : 'seekbot', config, players };
+    const seekers = {};
+    for (const b of bots) if (b.kind === 'seeker') seekers[b.uid] = true;
+    if (role === 'seeker') seekers.me = true;
+    const game = { hostUid: 'me', state: 'lobby', createdAt: now, seekers, config, players };
     if (T.demo) { game.state = 'running'; game.startedAt = now; }   // the demo skips the lobby
     db.set('games/' + CODE, game);
     api.enterGame(CODE);
@@ -96,7 +101,7 @@
       app.caption('');
       say(role === 'spectator'
         ? 'Judge demo: a 3-minute SFU Manhunt round on the Burnaby campus. You are watching every player live.'
-        : 'Judge demo: a 3-minute SFU Manhunt round on the Burnaby campus. You are a hider (blue dot); SeekerBot is hunting.', 7000);
+        : 'Judge demo: a 3-minute SFU Manhunt round on the Burnaby campus. You are a hider (blue dot); three SeekerBots are hunting.', 7000);
       say('Hiding phase: hiders get a head start before the seeker is released. Everything here also runs live on real phones with GPS.', 7000);
       D.seen.zone = true;
     }
@@ -184,10 +189,10 @@
         D.seen.ping = true;
         say('PING! The seeker sees every hider on the map for a few seconds. In a real game this happens every 3 minutes.');
       } else if (me.shieldK === k) {
-        if (!D.seen.shield) say('Your Shield hid you from that ping: SeekerBot only saw the other hiders.');
+        if (!D.seen.shield) say('Your Shield hid you from that ping: the seekers only saw the other hiders.');
         D.seen.shield = true;
       } else if (me.decoy && me.decoy.k === k) {
-        if (!D.decoySaid) say('Your Decoy worked: SeekerBot saw a fake location for you and is heading there.');
+        if (!D.decoySaid) say('Your Decoy worked: the seekers saw a fake location for you.');
         D.decoySaid = true;
       } else if (D.lastGap != null && gap < D.lastGap) {
         D.seen.faster = true;
@@ -208,8 +213,12 @@
       if (p.status !== 'out' || D.outs[uid]) continue;
       D.outs[uid] = true;
       if (p.outReason === 'tagged') {
+        if (!D.seen.tag) say(`${p.name} was tagged and confirmed it on their phone. A catch resets the ping speed back to normal.`);
+        else {
+          const left = Object.entries(g.players).filter(([u, q]) => q.status !== 'out' && q.role !== 'spectator' && !(g.seekers || {})[u]).length;
+          say(`${p.name} was tagged too. ${left} hiders left.`, 4000);
+        }
         D.seen.tag = true;
-        say(`${p.name} was tagged and confirmed it on their phone. A catch resets the ping speed back to normal.`);
       } else {
         D.seen.border = true;
         say(`${p.name} stayed outside the zone too long and was eliminated after the grace countdown.`);
@@ -319,8 +328,8 @@
     }
   }
 
-  // SeekerBot plays fair: it only knows what the pings show (so shields and decoys work on it).
-  // In the demo it never tags "you", and makes sure to catch someone around 2:10.
+  // SeekerBots play fair: they only know what the pings show (so shields and decoys work on them).
+  // In the demo they never tag "you", don't tag anyone before ~2:05, then make sure someone is caught.
   function seekerMove(b, g, c, t, updates) {
     if (t < c.headStartSec) return;
     const k = app.pingIndex();
@@ -340,9 +349,10 @@
       b.pos = moveToward(b.pos, b.chase, speed * db.scale);
       if (SFU.haversine(b.pos, b.chase) < 3) b.chase = null;   // reached the ping spot; wait for the next
     }
-    // Tag anyone (real position) within 8 m
+    // Tag any hider (real position) within 8 m
+    if (T.demo && t < 125) return;   // keep the demo's story: the first catch comes after the ping speed-ups
     for (const [uid, p] of Object.entries(g.players)) {
-      if (uid === b.uid || p.status === 'out' || p.lat == null || SFU.haversine(b.pos, p) >= 8) continue;
+      if ((g.seekers || {})[uid] || p.role === 'spectator' || p.status === 'out' || p.lat == null || SFU.haversine(b.pos, p) >= 8) continue;
       if (T.demo && uid === 'me') continue;
       const tg = (g.tags || {})[uid];
       const busy = tg && tg.status === 'pending' && Date.now() - tg.ts < c.tagExpireSec * 1000;
