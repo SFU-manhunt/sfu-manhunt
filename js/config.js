@@ -3,6 +3,10 @@
 // =====================================================================
 window.SFU = window.SFU || {};
 
+// App version. Must match version.json; phones running an older version get an
+// "Update" bar. Bump both (and the ?v= tags in index.html) with tools/bump-version.ps1.
+SFU.VERSION = 16;
+
 // ---------------------------------------------------------------------
 // 1) FIREBASE CONFIG  <<< PASTE YOUR OWN VALUES HERE >>>
 // Firebase console -> Project settings -> Your apps -> Web app -> Config.

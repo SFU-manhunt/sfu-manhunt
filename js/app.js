@@ -103,7 +103,43 @@
   }
 
   const fbConfigured = () => SFU.FIREBASE_CONFIG.apiKey && !SFU.FIREBASE_CONFIG.apiKey.startsWith('YOUR_');
-  const homeMsg = m => { $('home-msg').textContent = m || ''; };
+  // Home-screen messages also pop up as a toast: the message line sits far down
+  // the page on phones, so errors there were easy to miss.
+  const homeMsg = m => { $('home-msg').textContent = m || ''; if (m) toast(m, 5000); };
+
+  // Show "Offline" if the connection to Firebase drops for more than 3 s
+  // (short blips are normal on mobile data).
+  function watchConnection() {
+    if (!S.db || !S.db.onConnection || S.netWatched) return;
+    S.netWatched = true;
+    let timer = null;
+    S.db.onConnection(on => {
+      clearTimeout(timer);
+      if (on) $('net-badge').hidden = true;
+      else timer = setTimeout(() => { $('net-badge').hidden = S.test; }, 3000);
+    });
+  }
+
+  // Phones can keep running an old copy of the app (especially when added to the
+  // Home Screen). Check version.json and offer a one-tap update.
+  async function checkVersion() {
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      const latest = (await r.json()).v;
+      if (latest > SFU.VERSION) {
+        $('update-bar').hidden = false;
+        $('btn-update').onclick = () => location.replace(location.pathname + '?v=' + latest);
+      }
+    } catch (e) {}
+  }
+
+  // Run an async action from a button, showing a busy label and ignoring double taps.
+  async function busy(btn, label, fn) {
+    if (btn.disabled) return;
+    const text = btn.textContent;
+    btn.disabled = true; btn.textContent = label;
+    try { await fn(); } finally { btn.disabled = false; btn.textContent = text; }
+  }
 
   function readName() {
     const n = $('in-name').value.trim();
@@ -158,6 +194,7 @@
     try {
       S.db = SFU.makeFirebaseDb(SFU.FIREBASE_CONFIG);
       S.uid = await S.db.init();
+      watchConnection();
       return true;
     } catch (e) {
       S.db = null;
@@ -192,16 +229,17 @@
 
   async function joinGame() {
     const name = readName();
-    const code = $('in-code').value.trim().toUpperCase();
+    const code = $('in-code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!name) return;
-    if (code.length < 4) { homeMsg('Enter the game code.'); return; }
+    if (code.length !== 5) { homeMsg(code ? 'Game codes are 5 letters/numbers. Check the code.' : 'Enter the game code.'); return; }
     if (!await ensureBackend()) return;
     SFU.Audio.unlock();
     try {
       const g = await S.db.get('games/' + code);
-      if (!g) { homeMsg('No game with code ' + code + '.'); return; }
+      if (!g) { homeMsg('No game with code ' + code + '. Check the code with the host.'); return; }
       if (!(g.players && g.players[S.uid])) {
-        if (g.state !== 'lobby') { homeMsg('That game has already started.'); return; }
+        if (g.state === 'ended') { homeMsg('Game ' + code + ' has already ended.'); return; }
+        if (g.state !== 'lobby') { homeMsg('Game ' + code + ' has already started. Ask the host to start a new one.'); return; }
         await S.db.set('games/' + code + '/players/' + S.uid, { name, role: 'hider', status: 'alive', joinedAt: S.db.realNow() });
       }
       enterGame(code);
@@ -330,6 +368,18 @@
     setTool('none');
     showScreen('home');
     homeMsg(msg || '');
+  }
+
+  // Leave on purpose: take yourself off the player list (the host closes the game
+  // instead, because nobody else could start or run it).
+  function leaveAndRemove() {
+    const db = S.db, code = S.code, uid = S.uid, g = S.game;
+    leaveGame();
+    if (!db || !code || !g) return;
+    const done = g.hostUid === uid && g.state !== 'ended'
+      ? db.update('games/' + code, { state: 'ended', winner: 'stopped', endedAt: db.realNow() })
+      : (g.players && g.players[uid] ? db.remove('games/' + code + '/players/' + uid) : Promise.resolve());
+    done.catch(e => console.warn('Could not leave cleanly', e));
   }
 
   // ------------------------------------------------------------------ GPS
@@ -596,7 +646,8 @@
         const b = el('button', role === 'seeker' ? 'Seeker ✓' : 'Make seeker', 'small' + (role === 'seeker' ? ' active' : ''));
         b.onclick = () => {
           if (role !== 'seeker' && seekerUids().length >= cfg().maxSeekers) { toast('Up to ' + cfg().maxSeekers + ' seekers. Tap a seeker to remove them first.'); return; }
-          S.db.update(gamePath('seekers'), { [uid]: role === 'seeker' ? null : true });
+          S.db.update(gamePath('seekers'), { [uid]: role === 'seeker' ? null : true })
+            .catch(e => toast('Could not save seekers (' + e.message + '). Are the latest Firebase rules published?', 6000));
         };
         li.appendChild(b);
       } else {
@@ -1089,7 +1140,9 @@
     else if (g.winner === 'hiders') { title.textContent = 'Hiders win!'; body.textContent = left.length + ' hider(s) survived until time ran out.'; }
     else {
       title.textContent = 'GAME STOPPED'; title.style.color = 'var(--red)';
-      body.textContent = 'The host stopped the game. Go to the meeting point: ' + (c.meetingPoint || 'ask the host') + '.';
+      body.textContent = g.startedAt
+        ? 'The host stopped the game. Go to the meeting point: ' + (c.meetingPoint || 'ask the host') + '.'
+        : 'The host left, so this lobby is closed. Join or create a new game.';
     }
     const ul = $('end-list');
     ul.innerHTML = '';
@@ -1128,12 +1181,16 @@
   function startDemo(role) { SFU.Test.begin(api, role, { demo: true }); }
 
   function wire() {
+    checkVersion();
+    setInterval(checkVersion, 60000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
     try {
       $('in-name').value = localStorage.getItem('sfu_name') || '';
     } catch (e) {}
     $('fb-warn').hidden = fbConfigured();
-    $('btn-create').onclick = createGame;
-    $('btn-join').onclick = joinGame;
+    $('btn-create').onclick = () => busy($('btn-create'), 'Creating…', createGame);
+    $('btn-join').onclick = () => busy($('btn-join'), 'Joining…', joinGame);
+    $('in-code').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('btn-join').click(); } });
     $('btn-test').onclick = () => {
       SFU.Audio.unlock();
       modal('Test mode', 'Play as which role? Simulated players move around the Burnaby campus.', [
@@ -1142,12 +1199,20 @@
         { label: 'Cancel' }
       ]);
     };
-    $('btn-leave').onclick = () => leaveGame();
+    // Leaving (the button) removes you from the game. Closing the app or switching
+    // apps does NOT, so players can tab out and come back.
+    const confirmLeave = () => {
+      if (S.test) { leaveGame(); return; }
+      const host = amHost(), others = Object.keys(players()).length > 1, lobby = S.phase === 'lobby';
+      if (lobby && !(host && others)) { leaveAndRemove(); return; }
+      modal(lobby ? 'Leave the lobby?' : 'Leave this game?',
+        host ? 'You\'re the host. Leaving ends the game for everyone.'
+             : 'You\'ll be removed from the game and can\'t rejoin it. (Switching apps or locking your phone doesn\'t remove you.)',
+        [{ label: 'Leave', cls: 'primary', fn: leaveAndRemove }, { label: 'Stay' }]);
+    };
+    $('btn-leave').onclick = confirmLeave;
+    $('btn-leave-game').onclick = confirmLeave;
     $('btn-home').onclick = () => leaveGame();
-    $('btn-leave-game').onclick = () => modal('Leave this game?',
-      S.test ? 'This ends the test / demo.' : 'You can rejoin later from the start screen with the same code. The game keeps going for everyone else.', [
-        { label: 'Leave', cls: 'primary', fn: () => leaveGame() }, { label: 'Stay' }
-      ]);
     $('btn-demo').onclick = () => {
       SFU.Audio.unlock();
       modal('Judge demo (3 min)', 'A scripted round on the SFU Burnaby map with captions. Recommended: play as a hider so judges see powerups, pings and the wrist device.', [
@@ -1188,7 +1253,13 @@
 
     // After a refresh, offer to rejoin your last game (never jump in automatically).
     // Games that should have finished long ago are forgotten.
-    $('btn-rejoin-forget').onclick = () => { try { localStorage.removeItem('sfu_code'); } catch (e) {} $('rejoin-card').hidden = true; };
+    // "Forget it" counts as leaving: take yourself off that game's player list
+    $('btn-rejoin-forget').onclick = () => {
+      const code = $('rejoin-code').textContent;
+      try { localStorage.removeItem('sfu_code'); } catch (e) {}
+      $('rejoin-card').hidden = true;
+      if (S.db && code) S.db.remove('games/' + code + '/players/' + S.uid).catch(() => {});
+    };
     let saved = null;
     try { saved = localStorage.getItem('sfu_code'); } catch (e) {}
     if (saved && fbConfigured()) {

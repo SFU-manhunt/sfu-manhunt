@@ -7,10 +7,16 @@
 <title>SFU Manhunt</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="css/style.css?v=14">
+<link rel="stylesheet" href="css/style.css?v=16">
 </head>
 <body>
 <div id="map"></div>
+
+<div id="update-bar" class="update-bar" hidden>
+  <span>A new version of SFU Manhunt is available.</span>
+  <button id="btn-update" class="small">Update</button>
+</div>
+<div id="net-badge" class="net-badge" hidden>Offline: reconnecting…</div>
 
 <!-- ============ HOME ============ -->
 <section id="screen-home" class="screen sheet full active">
@@ -26,7 +32,7 @@
     </div>
   </div>
 
-  <label>Your name <input id="in-name" maxlength="20" autocomplete="nickname"></label>
+  <label>Your name <input id="in-name" maxlength="20" autocomplete="nickname" autocorrect="off" spellcheck="false"></label>
 
   <div class="card">
     <button id="btn-create" class="primary wide">Create game</button>
@@ -34,7 +40,7 @@
   </div>
 
   <div class="card">
-    <label>Game code <input id="in-code" maxlength="5" autocapitalize="characters" autocomplete="off"></label>
+    <label>Game code <input id="in-code" maxlength="5" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go"></label>
     <button id="btn-join" class="wide">Join game</button>
   </div>
 
@@ -262,12 +268,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="js/config.js?v=14"></script>
-<script src="js/campus.js?v=14"></script>
-<script src="js/geo.js?v=14"></script>
-<script src="js/db.js?v=14"></script>
-<script src="js/sound.js?v=14"></script>
-<script src="js/app.js?v=14"></script>
-<script src="js/testmode.js?v=14"></script>
+<script src="js/config.js?v=16"></script>
+<script src="js/campus.js?v=16"></script>
+<script src="js/geo.js?v=16"></script>
+<script src="js/db.js?v=16"></script>
+<script src="js/sound.js?v=16"></script>
+<script src="js/app.js?v=16"></script>
+<script src="js/testmode.js?v=16"></script>
 </body>
 </html>

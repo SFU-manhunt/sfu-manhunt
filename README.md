@@ -95,6 +95,8 @@ Old games stay in the database. Delete the `games` node in the console now and t
 4. After 1–2 minutes it's live at `https://sfu-manhunt.github.io/sfu-manhunt/`.
 5. In Firebase, go to **Authentication → Settings → Authorized domains → Add domain** and add `sfu-manhunt.github.io`.
 
+**Before pushing a change to the app,** run `powershell -File tools\bump-version.ps1` in the project folder. It bumps the version in `version.json`, `js/config.js` and `index.html`, so phones on an older copy get an **"A new version is available → Update"** bar.
+
 To update the site later, upload the changed files again the same way. Or install [GitHub Desktop](https://desktop.github.com) to sync the folder with one click.
 
 ## 4. Playing on iPhone

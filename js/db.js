@@ -21,6 +21,7 @@
       },
       now: () => Date.now() + offset,
       realNow: () => Date.now() + offset,
+      onConnection(cb) { db.ref('.info/connected').on('value', s => cb(!!s.val())); },
       on(path, cb) {
         const ref = db.ref(path);
         const h = ref.on('value', s => cb(s.val()));
